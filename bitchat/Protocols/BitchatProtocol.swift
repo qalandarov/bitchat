@@ -132,6 +132,7 @@ enum LazyHandshakeState {
 
 // Delivery status for messages
 enum DeliveryStatus: Codable, Equatable {
+    case notSentYet
     case sending
     case sent  // Left our device
     case delivered(to: String, at: Date)  // Confirmed by recipient
@@ -141,18 +142,28 @@ enum DeliveryStatus: Codable, Equatable {
     
     var displayText: String {
         switch self {
-        case .sending:
-            return "Sending..."
-        case .sent:
-            return "Sent"
-        case .delivered(let nickname, _):
-            return "Delivered to \(nickname)"
-        case .read(let nickname, _):
-            return "Read by \(nickname)"
-        case .failed(let reason):
-            return "Failed: \(reason)"
-        case .partiallyDelivered(let reached, let total):
-            return "Delivered to \(reached)/\(total)"
+        case .notSentYet:                                   "Not sent yet"
+        case .sending:                                      "Sending..."
+        case .sent:                                         "Sent"
+        case .delivered(let nickname, _):                   "Delivered to \(nickname)"
+        case .read(let nickname, _):                        "Read by \(nickname)"
+        case .failed(let reason):                           "Failed: \(reason)"
+        case .partiallyDelivered(let reached, let total):   "Delivered to \(reached)/\(total)"
+        }
+    }
+    
+    // De-duplicate by message ID: keep the item with the most advanced delivery status.
+    // This prevents duplicate IDs causing LazyVStack warnings and blank rows, and ensures
+    // we show the row whose status has already progressed to delivered/read.
+    var rank: Int {
+        switch self {
+        case .notSentYet:           0
+        case .failed:               1
+        case .sending:              2
+        case .sent:                 3
+        case .partiallyDelivered:   4
+        case .delivered:            5
+        case .read:                 6
         }
     }
 }

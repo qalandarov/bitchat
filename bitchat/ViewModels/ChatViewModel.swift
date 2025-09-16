@@ -2599,19 +2599,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // This prevents duplicate read receipts
         // IMPORTANT: Only add messages WE sent to sentReadReceipts, not messages we received
         if let messages = privateChats[peerID] {
-            for message in messages {
-                // Only track read receipts for messages WE sent (not received messages)
-                if message.sender == nickname {
-                    // Check if message has been read or delivered
-                    if let status = message.deliveryStatus {
-                        switch status {
-                        case .read, .delivered:
-                            sentReadReceipts.insert(message.id)
-                            privateChatManager.sentReadReceipts.insert(message.id)
-                        default:
-                            break
-                        }
-                    }
+            for message in messages where message.sender == nickname {
+                // Check if message has been read or delivered
+                switch message.deliveryStatus {
+                case .read, .delivered:
+                    sentReadReceipts.insert(message.id)
+                    privateChatManager.sentReadReceipts.insert(message.id)
+                case .notSentYet, .sending, .sent, .partiallyDelivered, .failed:
+                    break
                 }
             }
         }
@@ -3039,26 +3034,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
 
-        // De-duplicate by message ID: keep the item with the most advanced delivery status.
-        // This prevents duplicate IDs causing LazyVStack warnings and blank rows, and ensures
-        // we show the row whose status has already progressed to delivered/read.
-        func statusRank(_ s: DeliveryStatus?) -> Int {
-            guard let s = s else { return 0 }
-            switch s {
-            case .failed: return 1
-            case .sending: return 2
-            case .sent: return 3
-            case .partiallyDelivered: return 4
-            case .delivered: return 5
-            case .read: return 6
-            }
-        }
-
         var bestByID: [String: BitchatMessage] = [:]
         for msg in combined {
             if let existing = bestByID[msg.id] {
-                let lhs = statusRank(existing.deliveryStatus)
-                let rhs = statusRank(msg.deliveryStatus)
+                let lhs = existing.deliveryStatus.rank
+                let rhs = msg.deliveryStatus.rank
                 if rhs > lhs || (rhs == lhs && msg.timestamp > existing.timestamp) {
                     bestByID[msg.id] = msg
                 }
@@ -5789,7 +5769,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Fix delivery status for incoming messages
         var messageToStore = message
         if message.sender != nickname {
-            if messageToStore.deliveryStatus == nil || messageToStore.deliveryStatus == .sending {
+            if messageToStore.deliveryStatus == .notSentYet || messageToStore.deliveryStatus == .sending {
                 messageToStore.deliveryStatus = .delivered(to: nickname, at: Date())
             }
         }

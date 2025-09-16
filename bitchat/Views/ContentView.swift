@@ -314,9 +314,8 @@ struct ContentView: View {
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                         
                                         // Delivery status indicator for private messages
-                                        if message.isPrivate && message.sender == viewModel.nickname,
-                                           let status = message.deliveryStatus {
-                                            DeliveryStatusView(status: status, colorScheme: colorScheme)
+                                        if message.isPrivate && message.sender == viewModel.nickname {
+                                            DeliveryStatusView(status: message.deliveryStatus, colorScheme: colorScheme)
                                                 .padding(.leading, 4)
                                         }
                                     }
@@ -1613,7 +1612,7 @@ struct DeliveryStatusView: View {
     
     var body: some View {
         switch status {
-        case .sending:
+        case .notSentYet, .sending:
             Image(systemName: "circle")
                 .font(.system(size: 10))
                 .foregroundColor(secondaryTextColor.opacity(0.6))

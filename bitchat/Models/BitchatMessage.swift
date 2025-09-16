@@ -23,7 +23,7 @@ final class BitchatMessage: Codable {
     let recipientNickname: String?
     let senderPeerID: String?
     let mentions: [String]?  // Array of mentioned nicknames
-    var deliveryStatus: DeliveryStatus? // Delivery tracking
+    var deliveryStatus: DeliveryStatus // Delivery tracking
     
     // Cached formatted text (not included in Codable)
     private var _cachedFormattedText: [String: AttributedString] = [:]
@@ -53,7 +53,7 @@ final class BitchatMessage: Codable {
         self.recipientNickname = recipientNickname
         self.senderPeerID = senderPeerID
         self.mentions = mentions
-        self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : nil)
+        self.deliveryStatus = deliveryStatus ?? (isPrivate ? .sending : .notSentYet)
     }
 }
 
