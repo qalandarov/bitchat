@@ -235,7 +235,7 @@ final class PrivateChatManager: ObservableObject {
             }
         } else {
             // Fallback: preserve previous behavior
-            meshService?.sendReadReceipt(receipt, to: senderPeerID)
+            meshService?.sendReadReceipt(receipt, to: Peer(str: senderPeerID))
         }
     }
 }

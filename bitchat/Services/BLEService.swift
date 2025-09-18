@@ -611,20 +611,19 @@ final class BLEService: NSObject {
         sendPrivateMessage(content, to: peerID, messageID: UUID().uuidString)
     }
     
-    func sendReadReceipt(_ receipt: ReadReceipt, to peerID: String) {
+    func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer) {
         // Create typed payload: [type byte] + [message ID]
         var payload = Data([NoisePayloadType.readReceipt.rawValue])
         payload.append(contentsOf: receipt.originalMessageID.utf8)
 
-        let peer = Peer(str: peerID)
         if noiseService.hasEstablishedSession(with: peer) {
-            SecureLogger.debug("📤 Sending READ receipt for message \(receipt.originalMessageID) to \(peerID)", category: .session)
+            SecureLogger.debug("📤 Sending READ receipt for message \(receipt.originalMessageID) to \(peer)", category: .session)
             do {
                 let encrypted = try noiseService.encrypt(payload, for: peer)
                 let packet = BitchatPacket(
                     type: MessageType.noiseEncrypted.rawValue,
                     senderID: myPeerIDData,
-                    recipientID: Data(hexString: peerID),
+                    recipientID: Data(hexString: peer.id),
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                     payload: encrypted,
                     signature: nil,
@@ -642,10 +641,10 @@ final class BLEService: NSObject {
             // Queue for after handshake and initiate if needed
             collectionsQueue.async(flags: .barrier) { [weak self] in
                 guard let self = self else { return }
-                self.pendingNoisePayloadsAfterHandshake[peerID, default: []].append(payload)
+                self.pendingNoisePayloadsAfterHandshake[peer.id, default: []].append(payload)
             }
-            if !noiseService.hasSession(with: peer) { initiateNoiseHandshake(with: peerID) }
-            SecureLogger.debug("🕒 Queued READ receipt for \(peerID) until handshake completes", category: .session)
+            if !noiseService.hasSession(with: peer) { initiateNoiseHandshake(with: peer.id) }
+            SecureLogger.debug("🕒 Queued READ receipt for \(peer.id) until handshake completes", category: .session)
         }
     }
     

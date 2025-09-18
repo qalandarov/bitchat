@@ -42,7 +42,7 @@ protocol Transport: AnyObject {
     // Messaging
     func sendMessage(_ content: String, mentions: [String])
     func sendPrivateMessage(_ content: String, to peer: Peer, recipientNickname: String, messageID: String)
-    func sendReadReceipt(_ receipt: ReadReceipt, to peerID: String)
+    func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer)
     func sendFavoriteNotification(to peerID: String, isFavorite: Bool)
     func sendBroadcastAnnounce()
     func sendDeliveryAck(for messageID: String, to peerID: String)

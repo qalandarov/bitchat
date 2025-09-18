@@ -90,9 +90,9 @@ final class NostrTransport: Transport {
         }
     }
 
-    func sendReadReceipt(_ receipt: ReadReceipt, to peerID: String) {
+    func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer) {
         // Enqueue and process with throttling to avoid relay rate limits
-        readQueue.append(QueuedRead(receipt: receipt, peerID: peerID))
+        readQueue.append(QueuedRead(receipt: receipt, peerID: peer.id))
         processReadQueueIfNeeded()
     }
 

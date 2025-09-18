@@ -58,10 +58,10 @@ final class MessageRouter {
         // Prefer mesh for reachable peers; BLE will queue if handshake is needed
         if mesh.isPeerReachable(peer) {
             SecureLogger.debug("Routing READ ack via mesh (reachable) to \(peer.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
-            mesh.sendReadReceipt(receipt, to: peer.id)
+            mesh.sendReadReceipt(receipt, to: peer)
         } else {
             SecureLogger.debug("Routing READ ack via Nostr to \(peer.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
-            nostr.sendReadReceipt(receipt, to: peer.id)
+            nostr.sendReadReceipt(receipt, to: peer)
         }
     }
 
