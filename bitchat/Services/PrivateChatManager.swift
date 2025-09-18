@@ -31,20 +31,20 @@ final class PrivateChatManager: ObservableObject {
     private let privateChatCap = TransportConfig.privateChatCap
     
     /// Start a private chat with a peer
-    func startChat(with peerID: String) {
-        selectedPeer = peerID
+    func startChat(with peer: Peer) {
+        selectedPeer = peer.id
         
         // Store fingerprint for persistence across reconnections
-        if let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)) {
+        if let fingerprint = meshService?.getFingerprint(for: peer) {
             selectedPeerFingerprint = fingerprint
         }
         
         // Mark messages as read
-        markAsRead(from: peerID)
+        markAsRead(from: peer)
         
         // Initialize chat if needed
-        if privateChats[peerID] == nil {
-            privateChats[peerID] = []
+        if privateChats[peer.id] == nil {
+            privateChats[peer.id] = []
         }
     }
     
@@ -55,8 +55,8 @@ final class PrivateChatManager: ObservableObject {
     }
     
     /// Remove duplicate messages by ID and keep chronological order
-    func sanitizeChat(for peerID: String) {
-        guard let arr = privateChats[peerID] else { return }
+    func sanitizeChat(for peer: Peer) {
+        guard let arr = privateChats[peer.id] else { return }
         var seen = Set<String>()
         var deduped: [BitchatMessage] = []
         for msg in arr.sorted(by: { $0.timestamp < $1.timestamp }) {
@@ -70,17 +70,17 @@ final class PrivateChatManager: ObservableObject {
                 }
             }
         }
-        privateChats[peerID] = deduped
+        privateChats[peer.id] = deduped
     }
     
     /// Mark messages from a peer as read
-    func markAsRead(from peerID: String) {
-        unreadMessages.remove(peerID)
+    func markAsRead(from peer: Peer) {
+        unreadMessages.remove(peer.id)
         
         // Send read receipts for unread messages that haven't been sent yet
-        if let messages = privateChats[peerID] {
+        if let messages = privateChats[peer.id] {
             for message in messages {
-                if message.senderPeer?.id == peerID && !message.isRelay && !sentReadReceipts.contains(message.id) {
+                if message.senderPeer == peer && !message.isRelay && !sentReadReceipts.contains(message.id) {
                     sendReadReceipt(for: message)
                 }
             }
@@ -91,7 +91,7 @@ final class PrivateChatManager: ObservableObject {
     
     private func sendReadReceipt(for message: BitchatMessage) {
         guard !sentReadReceipts.contains(message.id),
-              let senderPeerID = message.senderPeer?.id else {
+              let senderPeer = message.senderPeer else {
             return
         }
         
@@ -106,13 +106,13 @@ final class PrivateChatManager: ObservableObject {
         
         // Route via MessageRouter to avoid handshakeRequired spam when session isn't established
         if let router = messageRouter {
-            SecureLogger.debug("PrivateChatManager: sending READ ack for \(message.id.prefix(8))… to \(senderPeerID.prefix(8))… via router", category: .session)
+            SecureLogger.debug("PrivateChatManager: sending READ ack for \(message.id.prefix(8))… to \(senderPeer.id.prefix(8))… via router", category: .session)
             Task { @MainActor in
-                router.sendReadReceipt(receipt, to: Peer(str: senderPeerID))
+                router.sendReadReceipt(receipt, to: senderPeer)
             }
         } else {
             // Fallback: preserve previous behavior
-            meshService?.sendReadReceipt(receipt, to: Peer(str: senderPeerID))
+            meshService?.sendReadReceipt(receipt, to: senderPeer)
         }
     }
 }
