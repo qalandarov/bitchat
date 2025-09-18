@@ -41,7 +41,7 @@ final class NostrTransport: Transport {
     func peerNickname(peer: Peer) -> String? { nil }
     func getPeerNicknames() -> [String : String] { [:] }
 
-    func getFingerprint(for peerID: String) -> String? { nil }
+    func getFingerprint(for peer: Peer) -> String? { nil }
     func getNoiseSessionState(for peerID: String) -> LazyHandshakeState { .none }
     func triggerHandshake(with peerID: String) { /* no-op */ }
     

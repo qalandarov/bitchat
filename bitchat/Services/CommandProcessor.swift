@@ -183,7 +183,7 @@ final class CommandProcessor {
             var blockedNicknames: [String] = []
             if let peers = meshService?.getPeerNicknames() {
                 for (peerID, nickname) in peers {
-                    if let fingerprint = meshService?.getFingerprint(for: peerID),
+                    if let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)),
                        meshBlocked.contains(fingerprint) {
                         blockedNicknames.append(nickname)
                     }
@@ -214,7 +214,7 @@ final class CommandProcessor {
         let nickname = targetName.hasPrefix("@") ? String(targetName.dropFirst()) : targetName
         
         if let peerID = chatViewModel?.getPeerIDForNickname(nickname),
-           let fingerprint = meshService?.getFingerprint(for: peerID) {
+           let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)) {
             if identityManager.isBlocked(fingerprint: fingerprint) {
                 return .success(message: "\(nickname) is already blocked")
             }
@@ -258,7 +258,7 @@ final class CommandProcessor {
         let nickname = targetName.hasPrefix("@") ? String(targetName.dropFirst()) : targetName
         
         if let peerID = chatViewModel?.getPeerIDForNickname(nickname),
-           let fingerprint = meshService?.getFingerprint(for: peerID) {
+           let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)) {
             if !identityManager.isBlocked(fingerprint: fingerprint) {
                 return .success(message: "\(nickname) is not blocked")
             }

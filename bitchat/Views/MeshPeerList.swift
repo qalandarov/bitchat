@@ -99,7 +99,7 @@ struct MeshPeerList: View {
                                 }
                             } else {
                                 // Offline: prefer showing verified badge from persisted fingerprints
-                                if let fp = viewModel.getFingerprint(for: peer.id),
+                                if let fp = viewModel.getFingerprint(for: Peer(str: peer.id)),
                                    viewModel.verifiedFingerprints.contains(fp) {
                                     Image(systemName: "checkmark.seal.fill")
                                         .font(.system(size: 10))

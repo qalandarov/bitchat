@@ -92,7 +92,7 @@ struct FingerprintView: View {
                         .font(.system(size: 12, weight: .bold, design: .monospaced))
                         .foregroundColor(textColor.opacity(0.7))
                     
-                    if let fingerprint = viewModel.getFingerprint(for: statusPeerID) {
+                    if let fingerprint = viewModel.getFingerprint(for: Peer(str: statusPeerID)) {
                         Text(formatFingerprint(fingerprint))
                             .font(.system(size: 14, design: .monospaced))
                             .foregroundColor(textColor)

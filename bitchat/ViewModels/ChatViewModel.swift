@@ -3732,7 +3732,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
             // Check if fingerprint is verified using our persisted data
-            if let fingerprint = getFingerprint(for: peerID),
+            if let fingerprint = getFingerprint(for: Peer(str: peerID)),
                verifiedFingerprints.contains(fingerprint) {
                 peerEncryptionStatus[peerID] = .noiseVerified
             } else {
@@ -3763,7 +3763,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // to avoid SwiftUI update loops
         
         // Check if we've ever established a session by looking for a fingerprint
-        let hasEverEstablishedSession = getFingerprint(for: peerID) != nil
+        let hasEverEstablishedSession = getFingerprint(for: Peer(str: peerID)) != nil
         
         let sessionState = meshService.getNoiseSessionState(for: peerID)
         
@@ -3773,7 +3773,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         switch sessionState {
         case .established:
             // We have encryption, now check if it's verified
-            if let fingerprint = getFingerprint(for: peerID) {
+            if let fingerprint = getFingerprint(for: Peer(str: peerID)) {
                 if verifiedFingerprints.contains(fingerprint) {
                     status = .noiseVerified
                 } else {
@@ -3787,7 +3787,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If we've ever established a session, show secured instead of handshaking
             if hasEverEstablishedSession {
                 // Check if it was verified before
-                if let fingerprint = getFingerprint(for: peerID),
+                if let fingerprint = getFingerprint(for: Peer(str: peerID)),
                    verifiedFingerprints.contains(fingerprint) {
                     status = .noiseVerified
                 } else {
@@ -3801,7 +3801,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If we've ever established a session, show secured instead of no handshake
             if hasEverEstablishedSession {
                 // Check if it was verified before
-                if let fingerprint = getFingerprint(for: peerID),
+                if let fingerprint = getFingerprint(for: Peer(str: peerID)),
                    verifiedFingerprints.contains(fingerprint) {
                     status = .noiseVerified
                 } else {
@@ -3815,7 +3815,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If we've ever established a session, show secured instead of failed
             if hasEverEstablishedSession {
                 // Check if it was verified before
-                if let fingerprint = getFingerprint(for: peerID),
+                if let fingerprint = getFingerprint(for: Peer(str: peerID)),
                    verifiedFingerprints.contains(fingerprint) {
                     status = .noiseVerified
                 } else {
@@ -4197,7 +4197,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let noiseService = meshService.getNoiseService()
         
         if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
-            if let fingerprint = getFingerprint(for: peerID) {
+            if let fingerprint = getFingerprint(for: Peer(str: peerID)) {
                 if verifiedFingerprints.contains(fingerprint) {
                     peerEncryptionStatus[peerID] = .noiseVerified
                 } else {
@@ -4232,8 +4232,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func getFingerprint(for peerID: String) -> String? {
-        return unifiedPeerService.getFingerprint(for: peerID)
+    func getFingerprint(for peer: Peer) -> String? {
+        return unifiedPeerService.getFingerprint(for: peer)
     }
     
     //
@@ -4262,7 +4262,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Try to resolve through fingerprint and social identity
-        if let fingerprint = getFingerprint(for: peerID) {
+        if let fingerprint = getFingerprint(for: Peer(str: peerID)) {
             if let identity = identityManager.getSocialIdentity(for: fingerprint) {
                 // Prefer local petname if set
                 if let petname = identity.localPetname {
@@ -4292,7 +4292,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func verifyFingerprint(for peerID: String) {
-        guard let fingerprint = getFingerprint(for: peerID) else { return }
+        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return }
         
         // Update secure storage with verified status
         identityManager.setVerified(fingerprint: fingerprint, verified: true)
@@ -4306,7 +4306,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     func unverifyFingerprint(for peerID: String) {
-        guard let fingerprint = getFingerprint(for: peerID) else { return }
+        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return }
         identityManager.setVerified(fingerprint: fingerprint, verified: false)
         identityManager.forceSave()
         verifiedFingerprints.remove(fingerprint)
@@ -4323,7 +4323,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Also log any offline favorites and whether we consider them verified
         let offlineFavorites = unifiedPeerService.favorites.filter { !$0.isConnected }
         for fav in offlineFavorites {
-            let fp = unifiedPeerService.getFingerprint(for: fav.id)
+            let fp = unifiedPeerService.getFingerprint(for: Peer(str: fav.id))
             let isVer = fp.flatMap { verifiedFingerprints.contains($0) } ?? false
             let fpShort = fp?.prefix(8) ?? "nil"
             SecureLogger.info("⭐️ Favorite offline: \(fav.nickname) fp=\(fpShort) verified=\(isVer)", category: .security)
@@ -4485,7 +4485,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 if let last = lastVerifyNonceByPeer[peerID], last == tlv.nonceA { return }
                 lastVerifyNonceByPeer[peerID] = tlv.nonceA
                 // Record inbound challenge time keyed by stable fingerprint if available
-                if let fp = getFingerprint(for: peerID) {
+                if let fp = getFingerprint(for: Peer(str: peerID)) {
                     lastInboundVerifyChallengeAt[fp] = Date()
                     // If we've already verified this fingerprint locally, treat this as mutual and toast immediately (responder side)
                     if verifiedFingerprints.contains(fp) {
@@ -4513,7 +4513,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 let ok = VerificationService.shared.verifyResponseSignature(noiseKeyHex: resp.noiseKeyHex, nonceA: resp.nonceA, signature: resp.signature, signerPublicKeyHex: pending.signKeyHex)
                 if ok {
                     pendingQRVerifications.removeValue(forKey: peerID)
-                    if let fp = getFingerprint(for: peerID) {
+                    if let fp = getFingerprint(for: Peer(str: peerID)) {
                         let short = fp.prefix(8)
                         SecureLogger.info("🔐 Marking verified fingerprint: \(short)", category: .security)
                         identityManager.setVerified(fingerprint: fp, verified: true)
@@ -5742,7 +5742,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Migrate private chats when peer reconnects with new ID
     @MainActor
     private func migratePrivateChatsIfNeeded(for peerID: String, senderNickname: String) {
-        let currentFingerprint = getFingerprint(for: peerID)
+        let currentFingerprint = getFingerprint(for: Peer(str: peerID))
         
         if privateChats[peerID] == nil || privateChats[peerID]?.isEmpty == true {
             var migratedMessages: [BitchatMessage] = []

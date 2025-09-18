@@ -34,7 +34,7 @@ protocol Transport: AnyObject {
     func getPeerNicknames() -> [String: String]
 
     // Protocol utilities
-    func getFingerprint(for peerID: String) -> String?
+    func getFingerprint(for peer: Peer) -> String?
     func getNoiseSessionState(for peerID: String) -> LazyHandshakeState
     func triggerHandshake(with peerID: String)
     func getNoiseService() -> NoiseEncryptionService

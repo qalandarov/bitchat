@@ -35,7 +35,7 @@ final class PrivateChatManager: ObservableObject {
         selectedPeer = peerID
         
         // Store fingerprint for persistence across reconnections
-        if let fingerprint = meshService?.getFingerprint(for: peerID) {
+        if let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)) {
             selectedPeerFingerprint = fingerprint
         }
         
@@ -174,7 +174,7 @@ final class PrivateChatManager: ObservableObject {
         
         // Find peer with matching fingerprint
         for (peerID, _) in peers {
-            if meshService?.getFingerprint(for: peerID) == fingerprint {
+            if meshService?.getFingerprint(for: Peer(str: peerID)) == fingerprint {
                 selectedPeer = peerID
                 break
             }

@@ -247,7 +247,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     /// Check if peer is blocked
     func isBlocked(_ peerID: String) -> Bool {
         // Get fingerprint
-        guard let fingerprint = getFingerprint(for: peerID) else { return false }
+        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return false }
         
         // Check SecureIdentityStateManager for block status
         if let identity = identityManager.getSocialIdentity(for: fingerprint) {
@@ -324,7 +324,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Toggle blocked status
     func toggleBlocked(_ peerID: String) {
-        guard let fingerprint = getFingerprint(for: peerID) else { return }
+        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return }
         
         // Get or create social identity
         var identity = identityManager.getSocialIdentity(for: fingerprint)
@@ -354,22 +354,22 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
     
     /// Get fingerprint for peer ID
-    func getFingerprint(for peerID: String) -> String? {
+    func getFingerprint(for peer: Peer) -> String? {
         // Check cache first
-        if let cached = fingerprintCache[peerID] {
+        if let cached = fingerprintCache[peer.id] {
             return cached
         }
         
         // Try to get from mesh service
-        if let fingerprint = meshService.getFingerprint(for: peerID) {
-            fingerprintCache[peerID] = fingerprint
+        if let fingerprint = meshService.getFingerprint(for: peer) {
+            fingerprintCache[peer.id] = fingerprint
             return fingerprint
         }
         
         // Try to get from peer's public key
-        if let peer = getPeer(by: peerID) {
+        if let peer = getPeer(by: peer.id) {
             let fingerprint = peer.noisePublicKey.sha256Fingerprint()
-            fingerprintCache[peerID] = fingerprint
+            fingerprintCache[peer.id] = fingerprint
             return fingerprint
         }
         
@@ -381,11 +381,11 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     var allPeers: [BitchatPeer] { peers }
     var connectedPeers: [String] { Array(connectedPeerIDs) }
     var favoritePeers: Set<String> { 
-        Set(favorites.compactMap { getFingerprint(for: $0.id) })
+        Set(favorites.compactMap { getFingerprint(for: Peer(str: $0.id)) })
     }
     var blockedUsers: Set<String> {
-        Set(peers.compactMap { peer in
-            isBlocked(peer.id) ? getFingerprint(for: peer.id) : nil
+        Set(peers.compactMap { batchPeer in
+            isBlocked(batchPeer.id) ? getFingerprint(for: Peer(str: batchPeer.id)) : nil
         })
     }
 }

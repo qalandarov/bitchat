@@ -691,9 +691,9 @@ final class BLEService: NSObject {
         }
     }
     
-    func getPeerFingerprint(_ peerID: String) -> String? {
+    func getPeerFingerprint(_ peer: Peer) -> String? {
         return collectionsQueue.sync {
-            if let publicKey = peerInfos[peerID]?.noisePublicKey {
+            if let publicKey = peerInfos[peer.id]?.noisePublicKey {
                 // Use the same fingerprinting method as NoiseEncryptionService/UnifiedPeerService (SHA-256 of raw key)
                 let hash = SHA256.hash(data: publicKey)
                 return hash.map { String(format: "%02x", $0) }.joined()
@@ -783,8 +783,8 @@ final class BLEService: NSObject {
         return noiseService
     }
     
-    func getFingerprint(for peerID: String) -> String? {
-        return getPeerFingerprint(peerID)
+    func getFingerprint(for peer: Peer) -> String? {
+        return getPeerFingerprint(peer)
     }
     
     func sendMessage(_ content: String, mentions: [String] = [], to recipientID: String? = nil, messageID: String? = nil, timestamp: Date? = nil) {
