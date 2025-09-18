@@ -4629,24 +4629,23 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         //
     }
     
-    func didDisconnectFromPeer(_ peerID: String) {
-        SecureLogger.debug("👋 Peer disconnected: \(peerID)", category: .session)
+    func didDisconnectFromPeer(_ peer: Peer) {
+        SecureLogger.debug("👋 Peer disconnected: \(peer.id)", category: .session)
         
         // Remove ephemeral session from identity manager
-        identityManager.removeEphemeralSession(peer: Peer(str: peerID))
+        identityManager.removeEphemeralSession(peer: peer)
 
         // If the open PM is tied to this short peer ID, switch UI context to the full Noise key (offline favorite)
-        var derivedStableKeyHex: String? = shortIDToNoiseKey[peerID]
+        var derivedStableKeyHex: String? = shortIDToNoiseKey[peer.id]
         if derivedStableKeyHex == nil,
-           let key = meshService.getNoiseService().getPeerPublicKeyData(Peer(str: peerID)) {
+           let key = meshService.getNoiseService().getPeerPublicKeyData(peer) {
             derivedStableKeyHex = key.hexEncodedString()
-            shortIDToNoiseKey[peerID] = derivedStableKeyHex
+            shortIDToNoiseKey[peer.id] = derivedStableKeyHex
         }
 
-        if let current = selectedPrivateChatPeer, current == peerID,
-           let stableKeyHex = derivedStableKeyHex {
+        if peer.id == selectedPrivateChatPeer, let stableKeyHex = derivedStableKeyHex {
             // Migrate messages view context to stable key so header shows favorite + Nostr globe
-            if let messages = privateChats[peerID] {
+            if let messages = privateChats[peer.id] {
                 if privateChats[stableKeyHex] == nil { privateChats[stableKeyHex] = [] }
                 let existing = Set(privateChats[stableKeyHex]!.map { $0.id })
                 for msg in messages where !existing.contains(msg.id) {
@@ -4666,10 +4665,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     privateChats[stableKeyHex]?.append(updated)
                 }
                 privateChats[stableKeyHex]?.sort { $0.timestamp < $1.timestamp }
-                privateChats.removeValue(forKey: peerID)
+                privateChats.removeValue(forKey: peer.id)
             }
-            if unreadPrivateMessages.contains(peerID) {
-                unreadPrivateMessages.remove(peerID)
+            if unreadPrivateMessages.contains(peer.id) {
+                unreadPrivateMessages.remove(peer.id)
                 unreadPrivateMessages.insert(stableKeyHex)
             }
             selectedPrivateChatPeer = stableKeyHex
@@ -4684,10 +4683,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Clear sent read receipts for this peer since they'll need to be resent after reconnection
         // Only clear receipts for messages from this specific peer
-        if let messages = privateChats[peerID] {
+        if let messages = privateChats[peer.id] {
             for message in messages {
                 // Remove read receipts for messages FROM this peer (not TO this peer)
-                if message.senderPeer?.id == peerID {
+                if message.senderPeer == peer {
                     sentReadReceipts.remove(message.id)
                 }
             }

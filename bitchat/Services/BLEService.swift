@@ -1878,7 +1878,7 @@ final class BLEService: NSObject {
             // Get current peer list (after removal)
             let currentPeers = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
             
-            self.delegate?.didDisconnectFromPeer(peer.id)
+            self.delegate?.didDisconnectFromPeer(peer)
             self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
         }
     }
@@ -2030,7 +2030,7 @@ final class BLEService: NSObject {
         let now = Date()
         let last = recentDisconnectNotifies[peer]
         if last == nil || now.timeIntervalSince(last!) >= TransportConfig.bleDisconnectNotifyDebounceSeconds {
-            delegate?.didDisconnectFromPeer(peer.id)
+            delegate?.didDisconnectFromPeer(peer)
             recentDisconnectNotifies[peer] = now
         } else {
             // Suppressed duplicate disconnect notification
@@ -2199,7 +2199,7 @@ final class BLEService: NSObject {
                 let currentPeers = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
                 
                 for peer in disconnectedPeers {
-                    self.delegate?.didDisconnectFromPeer(peer.id)
+                    self.delegate?.didDisconnectFromPeer(peer)
                 }
                 // Publish snapshots so UnifiedPeerService updates connection/reachability icons
                 self.requestPeerDataPublish()
