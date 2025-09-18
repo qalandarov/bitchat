@@ -715,8 +715,8 @@ final class BLEService: NSObject {
         }
     }
     
-    func triggerHandshake(with peerID: String) {
-        initiateNoiseHandshake(with: peerID)
+    func triggerHandshake(with peer: Peer) {
+        initiateNoiseHandshake(with: peer.id)
     }
     
     func emergencyDisconnectAll() {

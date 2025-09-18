@@ -43,7 +43,7 @@ final class NostrTransport: Transport {
 
     func getFingerprint(for peer: Peer) -> String? { nil }
     func getNoiseSessionState(for peer: Peer) -> LazyHandshakeState { .none }
-    func triggerHandshake(with peerID: String) { /* no-op */ }
+    func triggerHandshake(with peer: Peer) { /* no-op */ }
     
     // Nostr does not use Noise sessions here; return a cached placeholder to avoid reallocation
     private static var cachedNoiseService: NoiseEncryptionService?

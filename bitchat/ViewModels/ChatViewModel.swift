@@ -2622,7 +2622,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let sessionState = meshService.getNoiseSessionState(for: Peer(str: peerID))
             switch sessionState {
             case .none, .failed:
-                meshService.triggerHandshake(with: peerID)
+                meshService.triggerHandshake(with: Peer(str: peerID))
             default:
                 break
             }
@@ -4592,7 +4592,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             pending.sent = true
             pendingQRVerifications[peerID] = pending
         } else {
-            meshService.triggerHandshake(with: peerID)
+            meshService.triggerHandshake(with: Peer(str: peerID))
         }
         return true
     }
