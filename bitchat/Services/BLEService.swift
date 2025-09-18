@@ -352,7 +352,7 @@ final class BLEService: NSObject {
 
     private func restartGossipManager() {
         gossipSyncManager?.stop()
-        let sync = GossipSyncManager(myPeerID: myPeer.id)
+        let sync = GossipSyncManager(myPeer: myPeer)
         sync.delegate = self
         sync.start()
         gossipSyncManager = sync
