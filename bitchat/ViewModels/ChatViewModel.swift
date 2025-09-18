@@ -4545,7 +4545,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
     }
 
-    func didReceivePublicMessage(from peerID: String, nickname: String, content: String, timestamp: Date) {
+    func didReceivePublicMessage(from peer: Peer, nickname: String, content: String, timestamp: Date) {
         Task { @MainActor in
             let normalized = content.trimmingCharacters(in: .whitespacesAndNewlines)
             let publicMentions = parseMentions(from: normalized)
@@ -4558,7 +4558,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 originalSender: nil,
                 isPrivate: false,
                 recipientNickname: nil,
-                senderPeer: Peer(str: peerID),
+                senderPeer: peer,
                 mentions: publicMentions.isEmpty ? nil : publicMentions
             )
             handlePublicMessage(msg)

@@ -1761,7 +1761,7 @@ final class BLEService: NSObject {
 
         let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
         notifyUI { [weak self] in
-            self?.delegate?.didReceivePublicMessage(from: peer.id, nickname: senderNickname, content: content, timestamp: ts)
+            self?.delegate?.didReceivePublicMessage(from: peer, nickname: senderNickname, content: content, timestamp: ts)
         }
     }
     
