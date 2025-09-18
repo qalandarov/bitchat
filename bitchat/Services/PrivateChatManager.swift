@@ -73,7 +73,7 @@ final class PrivateChatManager: ObservableObject {
             originalSender: nil,
             isPrivate: true,
             recipientNickname: peerNickname,
-            senderPeer: Peer(str: meshService.myPeerID),
+            senderPeer: meshService.myPeer,
             mentions: nil,
             deliveryStatus: .sending
         )
@@ -223,7 +223,7 @@ final class PrivateChatManager: ObservableObject {
         // Create read receipt using the simplified method
         let receipt = ReadReceipt(
             originalMessageID: message.id,
-            readerID: meshService?.myPeerID ?? "",
+            readerID: meshService?.myPeer.id ?? "",
             readerNickname: meshService?.myNickname ?? ""
         )
         

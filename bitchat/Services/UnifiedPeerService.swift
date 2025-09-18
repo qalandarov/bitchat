@@ -84,7 +84,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         // Phase 1: Add all mesh peers (connected and reachable)
         for peerInfo in meshPeers {
             let peerID = peerInfo.id
-            guard peerID != meshService.myPeerID else { continue }  // Never add self
+            guard peerID != meshService.myPeer.id else { continue }  // Never add self
             
             let peer = buildPeerFromMesh(
                 peerInfo: peerInfo,

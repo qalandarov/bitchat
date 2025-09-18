@@ -18,7 +18,7 @@ protocol Transport: AnyObject {
     var delegate: BitchatDelegate? { get set }
 
     // Identity
-    var myPeerID: String { get }
+    var myPeer: Peer { get }
     var myNickname: String { get }
     func setNickname(_ nickname: String)
 

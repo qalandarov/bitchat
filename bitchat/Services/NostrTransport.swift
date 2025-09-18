@@ -24,7 +24,7 @@ final class NostrTransport: Transport {
     private let readAckInterval: TimeInterval = TransportConfig.nostrReadAckInterval
     private let keychain: KeychainManagerProtocol
 
-    var myPeerID: String { senderPeerID }
+    var myPeer: Peer { Peer(str: senderPeerID) }
     var myNickname: String { "" }
     func setNickname(_ nickname: String) { /* not used for Nostr */ }
     

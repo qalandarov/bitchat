@@ -11,6 +11,8 @@ import struct CryptoKit.SHA256
 
 struct Peer: Equatable, Hashable {
     let id: String
+    
+    static let empty = Peer(str: "")
 }
 
 extension Peer {

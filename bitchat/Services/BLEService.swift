@@ -87,7 +87,7 @@ final class BLEService: NSObject {
     
     // MARK: - Identity
     
-    var myPeerID: String = ""
+    var myPeer: Peer = .empty
     var myNickname: String = "anon"
     private var noiseService: NoiseEncryptionService
     private let identityManager: SecureIdentityStateManagerProtocol
@@ -346,13 +346,13 @@ final class BLEService: NSObject {
 
     private func refreshPeerIdentity() {
         let fingerprint = noiseService.getIdentityFingerprint()
-        myPeerID = String(fingerprint.prefix(16))
-        myPeerIDData = Data(hexString: myPeerID) ?? Data()
+        myPeer = Peer(str: String(fingerprint.prefix(16)))
+        myPeerIDData = Data(hexString: myPeer.id) ?? Data()
     }
 
     private func restartGossipManager() {
         gossipSyncManager?.stop()
-        let sync = GossipSyncManager(myPeerID: myPeerID)
+        let sync = GossipSyncManager(myPeerID: myPeer.id)
         sync.delegate = self
         sync.start()
         gossipSyncManager = sync
@@ -807,7 +807,7 @@ final class BLEService: NSObject {
                 // Create packet with explicit fields so we can sign it
                 let basePacket = BitchatPacket(
                     type: MessageType.message.rawValue,
-                    senderID: Data(hexString: self.myPeerID) ?? Data(),
+                    senderID: Data(hexString: self.myPeer.id) ?? Data(),
                     recipientID: nil,
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                     payload: Data(content.utf8),
@@ -1318,7 +1318,7 @@ final class BLEService: NSObject {
     
     private func handleFragment(_ packet: BitchatPacket, from peerID: String) {
         // Don't process our own fragments
-        if peerID == myPeerID {
+        if peerID == myPeer.id {
             return
         }
         
@@ -1401,7 +1401,7 @@ final class BLEService: NSObject {
         // Important: do not dedup fragment packets globally (each piece must pass)
         // Special case: allow our own packets recovered via sync (TTL==0) to pass
         // through even if we've marked them as seen at send time.
-        let allowSelfSyncReplay = (packet.ttl == 0) && (senderID == myPeerID)
+        let allowSelfSyncReplay = (packet.ttl == 0) && (senderID == myPeer.id)
         if packet.type != MessageType.fragment.rawValue && !allowSelfSyncReplay && messageDeduplicator.isDuplicate(messageID) {
             // Announce packets (type 1) are sent every 10 seconds for peer discovery
             // It's normal to see these as duplicates - don't log them to reduce noise
@@ -1472,7 +1472,7 @@ final class BLEService: NSObject {
             let degree = collectionsQueue.sync { peerInfos.values.filter { $0.isConnected }.count }
             let decision = RelayController.decide(
                 ttl: packet.ttl,
-                senderIsSelf: senderID == myPeerID,
+                senderIsSelf: senderID == myPeer.id,
                 isEncrypted: packet.type == MessageType.noiseEncrypted.rawValue,
                 isDirectedEncrypted: (packet.type == MessageType.noiseEncrypted.rawValue) && (packet.recipientID != nil),
                 isDirectedFragment: packet.type == MessageType.fragment.rawValue && packet.recipientID != nil,
@@ -1515,7 +1515,7 @@ final class BLEService: NSObject {
         }
         
         // Don't add ourselves as a peer
-        if peerID == myPeerID {
+        if peerID == myPeer.id {
             return
         }
         
@@ -1626,7 +1626,7 @@ final class BLEService: NSObject {
         }
 
         // Record this announce for lightweight rebroadcast buffer (exclude self)
-        if peerID != myPeerID {
+        if peerID != myPeer.id {
             collectionsQueue.async(flags: .barrier) { [weak self] in
                 guard let self = self else { return }
                 self.recentAnnounceBySender[peerID] = packet
@@ -1697,13 +1697,13 @@ final class BLEService: NSObject {
         // Ignore self-origin public messages except when returned via sync (TTL==0).
         // This allows our own messages to be surfaced when they come back via
         // the sync path without re-processing regular relayed copies.
-        if peerID == myPeerID && packet.ttl != 0 { return }
+        if peerID == myPeer.id && packet.ttl != 0 { return }
 
         var accepted = false
         var senderNickname: String = ""
 
         // If the packet is from ourselves (e.g., recovered via sync TTL==0), accept immediately
-        if peerID == myPeerID {
+        if peerID == myPeer.id {
             accepted = true
             senderNickname = myNickname
         }
@@ -1782,7 +1782,7 @@ final class BLEService: NSObject {
     private func handleNoiseHandshake(_ packet: BitchatPacket, from peerID: String) {
         // Use NoiseEncryptionService for handshake processing
         if let recipientID = packet.recipientID,
-           recipientID.hexEncodedString() == myPeerID {
+           recipientID.hexEncodedString() == myPeer.id {
             // Handshake is for us
             do {
                 if let response = try noiseService.processHandshakeMessage(from: Peer(str: peerID), message: packet.payload) {
@@ -1821,8 +1821,8 @@ final class BLEService: NSObject {
         }
         
         let recipientHex = recipientID.hexEncodedString()
-        if recipientHex != myPeerID {
-            SecureLogger.debug("🔐 Encrypted message not for me (for \(recipientHex), I am \(myPeerID))", category: .session)
+        if recipientHex != myPeer.id {
+            SecureLogger.debug("🔐 Encrypted message not for me (for \(recipientHex), I am \(myPeer.id))", category: .session)
             return
         }
         
@@ -1904,7 +1904,7 @@ final class BLEService: NSObject {
         let packet = BitchatPacket(
             type: MessageType.leave.rawValue,
             ttl: messageTTL,
-            senderID: myPeerID,
+            senderID: myPeer.id,
             payload: Data(myNickname.utf8)
         )
         broadcastPacket(packet)
@@ -2969,7 +2969,7 @@ extension BLEService: CBPeripheralManagerDelegate {
         let adData = buildAdvertisementData()
         peripheral.startAdvertising(adData)
         
-        SecureLogger.debug("📡 Started advertising (LocalName: \((adData[CBAdvertisementDataLocalNameKey] as? String) != nil ? "on" : "off"), ID: \(myPeerID.prefix(8))…)", category: .session)
+        SecureLogger.debug("📡 Started advertising (LocalName: \((adData[CBAdvertisementDataLocalNameKey] as? String) != nil ? "on" : "off"), ID: \(myPeer.id.prefix(8))…)", category: .session)
     }
     
     func peripheralManager(_ peripheral: CBPeripheralManager, central: CBCentral, didSubscribeTo characteristic: CBCharacteristic) {

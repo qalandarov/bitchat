@@ -11,7 +11,7 @@ final class MessageRouter {
     init(mesh: Transport, nostr: NostrTransport) {
         self.mesh = mesh
         self.nostr = nostr
-        self.nostr.senderPeerID = mesh.myPeerID
+        self.nostr.senderPeerID = mesh.myPeer.id
 
         // Observe favorites changes to learn Nostr mapping and flush queued messages
         NotificationCenter.default.addObserver(
