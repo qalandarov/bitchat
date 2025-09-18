@@ -4600,15 +4600,15 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // Mention parsing moved from BLE – use the existing non-optional helper below
     // MARK: - Peer Connection Events
     
-    func didConnectToPeer(_ peerID: String) {
-        SecureLogger.debug("🤝 Peer connected: \(peerID)", category: .session)
+    func didConnectToPeer(_ peer: Peer) {
+        SecureLogger.debug("🤝 Peer connected: \(peer.id)", category: .session)
         
         // Handle all main actor work async
         Task { @MainActor in
             isConnected = true
             
             // Register ephemeral session with identity manager
-            identityManager.registerEphemeralSession(peer: Peer(str: peerID), handshakeState: .none)
+            identityManager.registerEphemeralSession(peer: peer, handshakeState: .none)
             
             // Intentionally do not resend favorites on reconnect.
             // We only send our npub when a favorite is toggled on, or if our npub changes.
@@ -4617,13 +4617,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             objectWillChange.send()
 
             // Cache mapping to full Noise key for session continuity on disconnect
-            if let peer = unifiedPeerService.getPeer(by: peerID) {
+            if let peer = unifiedPeerService.getPeer(by: peer.id) {
                 let noiseKeyHex = peer.noisePublicKey.hexEncodedString()
-                shortIDToNoiseKey[peerID] = noiseKeyHex
+                shortIDToNoiseKey[peer.id] = noiseKeyHex
             }
 
             // Flush any queued messages for this peer via router
-            messageRouter.flushOutbox(for: Peer(str: peerID))
+            messageRouter.flushOutbox(for: peer)
         }
         
         //

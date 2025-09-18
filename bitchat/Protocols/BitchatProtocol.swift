@@ -161,7 +161,7 @@ enum DeliveryStatus: Codable, Equatable {
 
 protocol BitchatDelegate: AnyObject {
     func didReceiveMessage(_ message: BitchatMessage)
-    func didConnectToPeer(_ peerID: String)
+    func didConnectToPeer(_ peer: Peer)
     func didDisconnectFromPeer(_ peerID: String)
     func didUpdatePeerList(_ peers: [String])
     

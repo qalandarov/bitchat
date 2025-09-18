@@ -1634,7 +1634,7 @@ final class BLEService: NSObject {
             
             // Only notify of connection for new or reconnected peers when it is a direct announce
             if (packet.ttl == self.messageTTL) && (isNewPeer || isReconnectedPeer) {
-                self.delegate?.didConnectToPeer(peer.id)
+                self.delegate?.didConnectToPeer(peer)
                 // Schedule initial unicast sync to this peer
                 self.gossipSyncManager?.scheduleInitialSyncToPeer(peer, delaySeconds: 1.0)
             }
