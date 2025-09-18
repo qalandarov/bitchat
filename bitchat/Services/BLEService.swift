@@ -58,7 +58,7 @@ final class BLEService: NSObject {
         var isVerifiedNickname: Bool
         var lastSeen: Date
     }
-    private var peers: [String: PeerInfo] = [:]
+    private var peerInfos: [String: PeerInfo] = [:]
     
     // 4. Efficient Message Deduplication
     private let messageDeduplicator = MessageDeduplicator()
@@ -299,7 +299,7 @@ final class BLEService: NSObject {
 
     func currentPeerSnapshots() -> [TransportPeerSnapshot] {
         collectionsQueue.sync {
-            let snapshot = Array(peers.values)
+            let snapshot = Array(peerInfos.values)
             let resolvedNames = PeerDisplayNameResolver.resolve(
                 snapshot.map { ($0.id, $0.nickname, $0.isConnected) },
                 selfNickname: myNickname
@@ -557,7 +557,7 @@ final class BLEService: NSObject {
     func isPeerConnected(_ peerID: String) -> Bool {
         // Accept both 16-hex short IDs and 64-hex Noise keys
         let shortID = Peer(str: peerID).toShort().id
-        return collectionsQueue.sync { peers[shortID]?.isConnected ?? false }
+        return collectionsQueue.sync { peerInfos[shortID]?.isConnected ?? false }
     }
 
     func isPeerReachable(_ peerID: String) -> Bool {
@@ -565,8 +565,8 @@ final class BLEService: NSObject {
         let shortID = Peer(str: peerID).toShort().id
         return collectionsQueue.sync {
             // Must be mesh-attached: at least one live direct link to the mesh
-            let meshAttached = peers.values.contains { $0.isConnected }
-            guard let info = peers[shortID] else { return false }
+            let meshAttached = peerInfos.values.contains { $0.isConnected }
+            guard let info = peerInfos[shortID] else { return false }
             if info.isConnected { return true }
             guard meshAttached else { return false }
             // Apply reachability retention window
@@ -578,14 +578,14 @@ final class BLEService: NSObject {
 
     func peerNickname(peerID: String) -> String? {
         collectionsQueue.sync {
-            guard let peer = peers[peerID], peer.isConnected else { return nil }
-            return peer.nickname
+            guard let peerInfo = peerInfos[peerID], peerInfo.isConnected else { return nil }
+            return peerInfo.nickname
         }
     }
 
     func getPeerNicknames() -> [String: String] {
         return collectionsQueue.sync {
-            let connected = peers.filter { $0.value.isConnected }
+            let connected = peerInfos.filter { $0.value.isConnected }
             let tuples = connected.map { ($0.key, $0.value.nickname, true) }
             return PeerDisplayNameResolver.resolve(tuples, selfNickname: myNickname)
         }
@@ -693,7 +693,7 @@ final class BLEService: NSObject {
     
     func getPeerFingerprint(_ peerID: String) -> String? {
         return collectionsQueue.sync {
-            if let publicKey = peers[peerID]?.noisePublicKey {
+            if let publicKey = peerInfos[peerID]?.noisePublicKey {
                 // Use the same fingerprinting method as NoiseEncryptionService/UnifiedPeerService (SHA-256 of raw key)
                 let hash = SHA256.hash(data: publicKey)
                 return hash.map { String(format: "%02x", $0) }.joined()
@@ -724,7 +724,7 @@ final class BLEService: NSObject {
         
         // Clear all sessions and peers
         collectionsQueue.sync(flags: .barrier) {
-            peers.removeAll()
+            peerInfos.removeAll()
             incomingFragments.removeAll()
             fragmentMetadata.removeAll()
         }
@@ -1411,7 +1411,7 @@ final class BLEService: NSObject {
             }
             // In sparse graphs (<=2 neighbors), keep the pending relay to ensure bridging.
             // In denser graphs, cancel the pending relay to reduce redundant floods.
-            let connectedCount = collectionsQueue.sync { peers.values.filter { $0.isConnected }.count }
+            let connectedCount = collectionsQueue.sync { peerInfos.values.filter { $0.isConnected }.count }
             if connectedCount > 2 {
                 collectionsQueue.async(flags: .barrier) { [weak self] in
                     if let task = self?.scheduledRelays.removeValue(forKey: messageID) {
@@ -1470,7 +1470,7 @@ final class BLEService: NSObject {
         // Relay if TTL > 1 and we're not the original sender
         // Relay decision and scheduling (extracted via RelayController)
         do {
-            let degree = collectionsQueue.sync { peers.values.filter { $0.isConnected }.count }
+            let degree = collectionsQueue.sync { peerInfos.values.filter { $0.isConnected }.count }
             let decision = RelayController.decide(
                 ttl: packet.ttl,
                 senderIsSelf: senderID == myPeerID,
@@ -1523,7 +1523,7 @@ final class BLEService: NSObject {
         // Suppress announce logs to reduce noise
 
         // Precompute signature verification outside barrier to reduce contention
-        let existingPeerForVerify = collectionsQueue.sync { peers[peerID] }
+        let existingPeerForVerify = collectionsQueue.sync { peerInfos[peerID] }
         var verifiedAnnounce = false
         if packet.signature != nil {
             verifiedAnnounce = noiseService.verifyPacketSignature(packet, publicKey: announcement.signingPublicKey)
@@ -1553,7 +1553,7 @@ final class BLEService: NSObject {
             let isDirectAnnounce = (packet.ttl == messageTTL)
             
             // Check if we already have this peer (might be reconnecting)
-            let existingPeer = peers[peerID]
+            let existingPeer = peerInfos[peerID]
             let wasDisconnected = existingPeer?.isConnected == false
             
             // Set flags for use outside the sync block
@@ -1572,7 +1572,7 @@ final class BLEService: NSObject {
             // Update or create peer info
             if let existing = existingPeer, existing.isConnected {
                 // Update lastSeen and identity info
-                peers[peerID] = PeerInfo(
+                peerInfos[peerID] = PeerInfo(
                     id: existing.id,
                     nickname: announcement.nickname,
                     isConnected: isDirectAnnounce || hasPeripheralConnection || hasCentralSubscription,
@@ -1583,7 +1583,7 @@ final class BLEService: NSObject {
                 )
             } else {
                 // New peer or reconnecting peer
-                peers[peerID] = PeerInfo(
+                peerInfos[peerID] = PeerInfo(
                     id: peerID,
                     nickname: announcement.nickname,
                     isConnected: isDirectAnnounce || hasPeripheralConnection || hasCentralSubscription,
@@ -1645,7 +1645,7 @@ final class BLEService: NSObject {
             guard let self = self else { return }
             
             // Get current peer list (after addition)
-            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peers.keys) }
+            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
             
             // Only notify of connection for new or reconnected peers when it is a direct announce
             if (packet.ttl == self.messageTTL) && (isNewPeer || isReconnectedPeer) {
@@ -1708,12 +1708,12 @@ final class BLEService: NSObject {
             accepted = true
             senderNickname = myNickname
         }
-        else if let info = peers[peerID], info.isVerifiedNickname {
+        else if let info = peerInfos[peerID], info.isVerifiedNickname {
             // Known verified peer path
             accepted = true
             senderNickname = info.nickname
             // Handle nickname collisions
-            let hasCollision = peers.values.contains { $0.isConnected && $0.nickname == info.nickname && $0.id != peerID } || (myNickname == info.nickname)
+            let hasCollision = peerInfos.values.contains { $0.isConnected && $0.nickname == info.nickname && $0.id != peerID } || (myNickname == info.nickname)
             if hasCollision {
                 senderNickname += "#" + String(peerID.prefix(4))
             }
@@ -1882,7 +1882,7 @@ final class BLEService: NSObject {
     private func handleLeave(_ packet: BitchatPacket, from peerID: String) {
         _ = collectionsQueue.sync(flags: .barrier) {
             // Remove the peer when they leave
-            peers.removeValue(forKey: peerID)
+            peerInfos.removeValue(forKey: peerID)
         }
         // Remove any stored announcement for sync purposes
         gossipSyncManager?.removeAnnouncementForPeer(Peer(str: peerID))
@@ -1891,7 +1891,7 @@ final class BLEService: NSObject {
             guard let self = self else { return }
             
             // Get current peer list (after removal)
-            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peers.keys) }
+            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
             
             self.delegate?.didDisconnectFromPeer(peerID)
             self.delegate?.didUpdatePeerList(currentPeerIDs)
@@ -2033,9 +2033,9 @@ final class BLEService: NSObject {
     private func updatePeerLastSeen(_ peerID: String) {
         // Use async to avoid deadlock - we don't need immediate consistency for last seen updates
         collectionsQueue.async(flags: .barrier) {
-            if var peer = self.peers[peerID] {
-                peer.lastSeen = Date()
-                self.peers[peerID] = peer
+            if var peerInfo = self.peerInfos[peerID] {
+                peerInfo.lastSeen = Date()
+                self.peerInfos[peerID] = peerInfo
             }
         }
     }
@@ -2056,11 +2056,11 @@ final class BLEService: NSObject {
     private func publishFullPeerData() {
         let transportPeers: [TransportPeerSnapshot] = collectionsQueue.sync {
             // Compute nickname collision counts for connected peers
-            let connected = peers.values.filter { $0.isConnected }
+            let connected = peerInfos.values.filter { $0.isConnected }
             var counts: [String: Int] = [:]
             for p in connected { counts[p.nickname, default: 0] += 1 }
             counts[myNickname, default: 0] += 1
-            return peers.values.map { info in
+            return peerInfos.values.map { info in
                 var display = info.nickname
                 if info.isConnected, (counts[info.nickname] ?? 0) > 1 {
                     display += "#" + String(info.id.prefix(4))
@@ -2111,7 +2111,7 @@ final class BLEService: NSObject {
         
         // Adaptive announce: reduce frequency when we have connected peers
         let now = Date()
-        let connectedCount = collectionsQueue.sync { peers.values.filter { $0.isConnected }.count }
+        let connectedCount = collectionsQueue.sync { peerInfos.values.filter { $0.isConnected }.count }
         let elapsed = now.timeIntervalSince(lastAnnounceSent)
         if connectedCount == 0 {
             // Discovery mode: keep frequent announces
@@ -2137,7 +2137,7 @@ final class BLEService: NSObject {
         }
         
         // If we have no peers, ensure we're scanning and advertising
-        if peers.isEmpty {
+        if peerInfos.isEmpty {
             // Ensure we're advertising as peripheral
             if let pm = peripheralManager, pm.state == .poweredOn && !pm.isAdvertising {
                 pm.startAdvertising(buildAdvertisementData())
@@ -2175,10 +2175,10 @@ final class BLEService: NSObject {
         
         var removedOfflineCount = 0
         collectionsQueue.sync(flags: .barrier) {
-            for (peerID, peer) in peers {
-                let age = now.timeIntervalSince(peer.lastSeen)
-                let retention: TimeInterval = peer.isVerifiedNickname ? TransportConfig.bleReachabilityRetentionVerifiedSeconds : TransportConfig.bleReachabilityRetentionUnverifiedSeconds
-                if peer.isConnected && age > TransportConfig.blePeerInactivityTimeoutSeconds {
+            for (peerID, peerInfo) in peerInfos {
+                let age = now.timeIntervalSince(peerInfo.lastSeen)
+                let retention: TimeInterval = peerInfo.isVerifiedNickname ? TransportConfig.bleReachabilityRetentionVerifiedSeconds : TransportConfig.bleReachabilityRetentionUnverifiedSeconds
+                if peerInfo.isConnected && age > TransportConfig.blePeerInactivityTimeoutSeconds {
                     // Check if we still have an active BLE connection to this peer
                     let hasPeripheralConnection = peerToPeripheralUUID[peerID] != nil &&
                                                  peripherals[peerToPeripheralUUID[peerID]!]?.isConnected == true
@@ -2186,19 +2186,19 @@ final class BLEService: NSObject {
                     
                     // If direct link is gone, mark as not connected (retain entry for reachability)
                     if !hasPeripheralConnection && !hasCentralConnection {
-                        var updated = peer
+                        var updated = peerInfo
                         updated.isConnected = false
-                        peers[peerID] = updated
+                        peerInfos[peerID] = updated
                         disconnectedPeers.append(peerID)
                     }
                 }
                 // Cleanup: remove peers that are not connected and past reachability retention
-                if !peer.isConnected {
+                if !peerInfo.isConnected {
                     if age > retention {
-                        SecureLogger.debug("🗑️ Removing stale peer after reachability window: \(peerID) (\(peer.nickname))", category: .session)
+                        SecureLogger.debug("🗑️ Removing stale peer after reachability window: \(peerID) (\(peerInfo.nickname))", category: .session)
                         // Also remove any stored announcement from sync candidates
                         gossipSyncManager?.removeAnnouncementForPeer(Peer(str: peerID))
-                        peers.removeValue(forKey: peerID)
+                        peerInfos.removeValue(forKey: peerID)
                         removedOfflineCount += 1
                     }
                 }
@@ -2211,7 +2211,7 @@ final class BLEService: NSObject {
                 guard let self = self else { return }
                 
                 // Get current peer list (after removal)
-                let currentPeerIDs = self.collectionsQueue.sync { Array(self.peers.keys) }
+                let currentPeerIDs = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
                 
                 for peerID in disconnectedPeers {
                     self.delegate?.didDisconnectFromPeer(peerID)
@@ -2591,9 +2591,9 @@ func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeriph
             
             // Do not remove peer; mark as not connected but retain for reachability
             collectionsQueue.sync(flags: .barrier) {
-                if var info = peers[peerID] {
+                if var info = peerInfos[peerID] {
                     info.isConnected = false
-                    peers[peerID] = info
+                    peerInfos[peerID] = info
                 }
             }
         }
@@ -2614,7 +2614,7 @@ func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeriph
             guard let self = self else { return }
             
             // Get current peer list (after removal)
-            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peers.keys) }
+            let currentPeerIDs = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
             
             if let peerID = peerID {
                 self.notifyPeerDisconnectedDebounced(peerID)
@@ -2714,8 +2714,8 @@ extension BLEService {
         // Ensure the synthetic peer is known and marked verified for public-message tests
         let normalizedID = packet.senderID.hexEncodedString()
         collectionsQueue.sync(flags: .barrier) {
-            if peers[normalizedID] == nil {
-                peers[normalizedID] = PeerInfo(
+            if peerInfos[normalizedID] == nil {
+                peerInfos[normalizedID] = PeerInfo(
                     id: normalizedID,
                     nickname: "TestPeer_\(fromPeerID.prefix(4))",
                     isConnected: true,
@@ -2725,11 +2725,11 @@ extension BLEService {
                     lastSeen: Date()
                 )
             } else {
-                var p = peers[normalizedID]!
+                var p = peerInfos[normalizedID]!
                 p.isConnected = true
                 p.isVerifiedNickname = true
                 p.lastSeen = Date()
-                peers[normalizedID] = p
+                peerInfos[normalizedID] = p
             }
         }
         if DispatchQueue.getSpecific(key: messageQueueKey) != nil {
@@ -3001,9 +3001,9 @@ extension BLEService: CBPeripheralManagerDelegate {
         if let peerID = centralToPeerID[centralUUID] {
             // Mark peer as not connected; retain for reachability
             collectionsQueue.sync(flags: .barrier) {
-                if var info = peers[peerID] {
+                if var info = peerInfos[peerID] {
                     info.isConnected = false
-                    peers[peerID] = info
+                    peerInfos[peerID] = info
                 }
             }
             
@@ -3015,7 +3015,7 @@ extension BLEService: CBPeripheralManagerDelegate {
                 guard let self = self else { return }
                 
                 // Get current peer list (after removal)
-                let currentPeerIDs = self.collectionsQueue.sync { Array(self.peers.keys) }
+                let currentPeerIDs = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
                 
                 self.notifyPeerDisconnectedDebounced(peerID)
                 // Publish snapshots so UnifiedPeerService can refresh icons promptly
