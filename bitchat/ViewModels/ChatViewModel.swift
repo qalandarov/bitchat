@@ -2242,7 +2242,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Determine routing method and recipient nickname
         guard let noiseKey = Data(hexString: peerID) else { return }
         let isConnected = meshService.isPeerConnected(Peer(str: peerID))
-        let isReachable = meshService.isPeerReachable(peerID)
+        let isReachable = meshService.isPeerReachable(Peer(str: peerID))
         let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey)
         let isMutualFavorite = favoriteStatus?.isMutual ?? false
         let hasNostrKey = favoriteStatus?.peerNostrPublicKey != nil
@@ -4714,7 +4714,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 self.networkResetTimer = nil
                 // Count mesh peers that are connected OR recently reachable via mesh relays
                 let meshPeers = peers.filter { peerID in
-                    self.meshService.isPeerConnected(Peer(str: peerID)) || self.meshService.isPeerReachable(peerID)
+                    self.meshService.isPeerConnected(Peer(str: peerID)) || self.meshService.isPeerReachable(Peer(str: peerID))
                 }
                 
                 // Rising-edge only: previously zero peers, now > 0 peers

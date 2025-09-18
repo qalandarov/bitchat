@@ -1436,7 +1436,7 @@ struct ContentView: View {
                                     // Should not happen for PM header, but handle gracefully
                                     EmptyView()
                                 }
-                            } else if viewModel.meshService.isPeerReachable(headerPeerID) {
+                            } else if viewModel.meshService.isPeerReachable(Peer(str: headerPeerID)) {
                                 // Fallback: reachable via mesh but not in current peer list
                                 Image(systemName: "point.3.filled.connected.trianglepath.dotted")
                                     .font(.system(size: 14))

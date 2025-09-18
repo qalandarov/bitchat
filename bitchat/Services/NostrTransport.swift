@@ -37,7 +37,7 @@ final class NostrTransport: Transport {
     func emergencyDisconnectAll() { /* no-op */ }
 
     func isPeerConnected(_ peer: Peer) -> Bool { false }
-    func isPeerReachable(_ peerID: String) -> Bool { false }
+    func isPeerReachable(_ peer: Peer) -> Bool { false }
     func peerNickname(peerID: String) -> String? { nil }
     func getPeerNicknames() -> [String : String] { [:] }
 

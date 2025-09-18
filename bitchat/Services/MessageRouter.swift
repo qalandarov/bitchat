@@ -38,7 +38,7 @@ final class MessageRouter {
     }
 
     func sendPrivate(_ content: String, to peer: Peer, recipientNickname: String, messageID: String) {
-        let reachableMesh = mesh.isPeerReachable(peer.id)
+        let reachableMesh = mesh.isPeerReachable(peer)
         if reachableMesh {
             SecureLogger.debug("Routing PM via mesh (reachable) to \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
@@ -56,7 +56,7 @@ final class MessageRouter {
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer) {
         // Prefer mesh for reachable peers; BLE will queue if handshake is needed
-        if mesh.isPeerReachable(peer.id) {
+        if mesh.isPeerReachable(peer) {
             SecureLogger.debug("Routing READ ack via mesh (reachable) to \(peer.id.prefix(8))… id=\(receipt.originalMessageID.prefix(8))…", category: .session)
             mesh.sendReadReceipt(receipt, to: peer.id)
         } else {
@@ -66,7 +66,7 @@ final class MessageRouter {
     }
 
     func sendDeliveryAck(_ messageID: String, to peer: Peer) {
-        if mesh.isPeerReachable(peer.id) {
+        if mesh.isPeerReachable(peer) {
             SecureLogger.debug("Routing DELIVERED ack via mesh (reachable) to \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             mesh.sendDeliveryAck(for: messageID, to: peer.id)
         } else {
@@ -108,7 +108,7 @@ final class MessageRouter {
         var remaining: [(content: String, nickname: String, messageID: String)] = []
         // Prefer mesh if connected; else try Nostr if mapping exists
         for (content, nickname, messageID) in queued {
-            if mesh.isPeerReachable(peer.id) {
+            if mesh.isPeerReachable(peer) {
                 SecureLogger.debug("Outbox -> mesh for \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
                 mesh.sendPrivateMessage(content, to: peer.id, recipientNickname: nickname, messageID: messageID)
             } else if canSendViaNostr(peer: peer) {

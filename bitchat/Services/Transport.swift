@@ -29,7 +29,7 @@ protocol Transport: AnyObject {
 
     // Connectivity and peers
     func isPeerConnected(_ peer: Peer) -> Bool
-    func isPeerReachable(_ peerID: String) -> Bool
+    func isPeerReachable(_ peer: Peer) -> Bool
     func peerNickname(peerID: String) -> String?
     func getPeerNicknames() -> [String: String]
 
