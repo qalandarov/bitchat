@@ -1213,7 +1213,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             if let ephemeralID = ephemeralPeerID {
                 // Found the ephemeral peer, use normal toggle
-                unifiedPeerService.toggleFavorite(ephemeralID)
+                unifiedPeerService.toggleFavorite(Peer(str: ephemeralID))
                 // Also trigger UI update
                 objectWillChange.send()
             } else {
@@ -1258,7 +1258,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         } else {
             // This is an ephemeral peer ID (16 hex chars), use normal toggle
-            unifiedPeerService.toggleFavorite(peerID)
+            unifiedPeerService.toggleFavorite(Peer(str: peerID))
             // Trigger UI update
             objectWillChange.send()
         }
@@ -1340,7 +1340,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func isPeerBlocked(_ peerID: String) -> Bool {
-        return unifiedPeerService.isBlocked(peerID)
+        return unifiedPeerService.isBlocked(Peer(str: peerID))
     }
     
     // Helper method to find current peer ID for a fingerprint
@@ -2228,7 +2228,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard !content.isEmpty else { return }
         
         // Check if blocked
-        if unifiedPeerService.isBlocked(peerID) {
+        if unifiedPeerService.isBlocked(Peer(str: peerID)) {
             let nickname = meshService.peerNickname(peer: Peer(str: peerID)) ?? "user"
             addSystemMessage("cannot send message to \(nickname): user is blocked.")
             return
@@ -2456,7 +2456,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let peerNickname = meshService.peerNickname(peer: Peer(str: peerID)) ?? "unknown"
         
         // Check if the peer is blocked
-        if unifiedPeerService.isBlocked(peerID) {
+        if unifiedPeerService.isBlocked(Peer(str: peerID)) {
             addSystemMessage("cannot start chat with \(peerNickname): user is blocked.")
             return
         }
