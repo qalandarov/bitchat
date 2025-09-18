@@ -17,7 +17,7 @@ final class NostrTransport: Transport {
     // Throttle READ receipts to avoid relay rate limits
     private struct QueuedRead {
         let receipt: ReadReceipt
-        let peerID: String
+        let peer: Peer
     }
     private var readQueue: [QueuedRead] = []
     private var isSendingReadAcks = false
@@ -61,7 +61,7 @@ final class NostrTransport: Transport {
 
     func sendPrivateMessage(_ content: String, to peer: Peer, recipientNickname: String, messageID: String) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             // Convert recipient npub -> hex (x-only)
@@ -92,7 +92,7 @@ final class NostrTransport: Transport {
 
     func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer) {
         // Enqueue and process with throttling to avoid relay rate limits
-        readQueue.append(QueuedRead(receipt: receipt, peerID: peer.id))
+        readQueue.append(QueuedRead(receipt: receipt, peer: peer))
         processReadQueueIfNeeded()
     }
 
@@ -107,7 +107,7 @@ final class NostrTransport: Transport {
         guard !readQueue.isEmpty else { isSendingReadAcks = false; return }
         let item = readQueue.removeFirst()
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: item.peerID) else { scheduleNextReadAck(); return }
+            guard let recipientNpub = resolveRecipientNpub(for: item.peer) else { scheduleNextReadAck(); return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { scheduleNextReadAck(); return }
             SecureLogger.debug("NostrTransport: preparing READ ack for id=\(item.receipt.originalMessageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
             // Convert recipient npub -> hex
@@ -117,7 +117,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { scheduleNextReadAck(); return }
                 recipientHex = data.hexEncodedString()
             } catch { scheduleNextReadAck(); return }
-            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peerID, senderPeerID: senderPeerID) else {
+            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peer.id, senderPeerID: senderPeerID) else {
                 SecureLogger.error("NostrTransport: failed to embed READ ack", category: .session)
                 scheduleNextReadAck(); return
             }
@@ -141,7 +141,7 @@ final class NostrTransport: Transport {
 
     func sendFavoriteNotification(to peer: Peer, isFavorite: Bool) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             let content = isFavorite ? "[FAVORITED]:\(senderIdentity.npub)" : "[UNFAVORITED]:\(senderIdentity.npub)"
             SecureLogger.debug("NostrTransport: preparing FAVORITE(\(isFavorite)) to \(recipientNpub.prefix(16))…", category: .session)
@@ -167,14 +167,14 @@ final class NostrTransport: Transport {
 
     // MARK: - Helpers
     @MainActor
-    private func resolveRecipientNpub(for peerID: String) -> String? {
-        if let noiseKey = Data(hexString: peerID),
+    private func resolveRecipientNpub(for peer: Peer) -> String? {
+        if let noiseKey = Data(hexString: peer.id),
            let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
            let npub = fav.peerNostrPublicKey {
             return npub
         }
-        if peerID.count == 16,
-           let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: Peer(str: peerID)),
+        if peer.isShort,
+           let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: peer),
            let npub = fav.peerNostrPublicKey {
             return npub
         }
@@ -184,7 +184,7 @@ final class NostrTransport: Transport {
     func sendBroadcastAnnounce() { /* no-op for Nostr */ }
     func sendDeliveryAck(for messageID: String, to peer: Peer) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             SecureLogger.debug("NostrTransport: preparing DELIVERED ack for id=\(messageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
             let recipientHex: String
