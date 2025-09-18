@@ -4435,12 +4435,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     // Low-level BLE events
-    func didReceiveNoisePayload(from peerID: String, type: NoisePayloadType, payload: Data, timestamp: Date) {
+    func didReceiveNoisePayload(from peer: Peer, type: NoisePayloadType, payload: Data, timestamp: Date) {
         Task { @MainActor in
             switch type {
             case .privateMessage:
                 guard let pm = PrivateMessagePacket.decode(from: payload) else { return }
-                let senderName = unifiedPeerService.getPeer(by: peerID)?.nickname ?? "Unknown"
+                let senderName = unifiedPeerService.getPeer(by: peer.id)?.nickname ?? "Unknown"
             let pmMentions = parseMentions(from: pm.content)
             let msg = BitchatMessage(
                 id: pm.messageID,
@@ -4451,27 +4451,27 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 originalSender: nil,
                 isPrivate: true,
                 recipientNickname: nickname,
-                senderPeer: Peer(str: peerID),
+                senderPeer: peer,
                 mentions: pmMentions.isEmpty ? nil : pmMentions
             )
                 handlePrivateMessage(msg)
                 // Send delivery ACK back over BLE
-                meshService.sendDeliveryAck(for: pm.messageID, to: Peer(str: peerID))
+                meshService.sendDeliveryAck(for: pm.messageID, to: peer)
 
             case .delivered:
                 guard let messageID = String(data: payload, encoding: .utf8) else { return }
-                if let name = unifiedPeerService.getPeer(by: peerID)?.nickname {
-                    if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peerID]?[idx].deliveryStatus = .delivered(to: name, at: Date())
+                if let name = unifiedPeerService.getPeer(by: peer.id)?.nickname {
+                    if let messages = privateChats[peer.id], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                        privateChats[peer.id]?[idx].deliveryStatus = .delivered(to: name, at: Date())
                         objectWillChange.send()
                     }
                 }
 
             case .readReceipt:
                 guard let messageID = String(data: payload, encoding: .utf8) else { return }
-                if let name = unifiedPeerService.getPeer(by: peerID)?.nickname {
-                    if let messages = privateChats[peerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peerID]?[idx].deliveryStatus = .read(by: name, at: Date())
+                if let name = unifiedPeerService.getPeer(by: peer.id)?.nickname {
+                    if let messages = privateChats[peer.id], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                        privateChats[peer.id]?[idx].deliveryStatus = .read(by: name, at: Date())
                         objectWillChange.send()
                     }
                 }
@@ -4482,10 +4482,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 let myNoiseHex = meshService.getNoiseService().getStaticPublicKeyData().hexEncodedString().lowercased()
                 guard tlv.noiseKeyHex.lowercased() == myNoiseHex else { return }
                 // Deduplicate: ignore if we've already responded to this nonce for this peer
-                if let last = lastVerifyNonceByPeer[peerID], last == tlv.nonceA { return }
-                lastVerifyNonceByPeer[peerID] = tlv.nonceA
+                if let last = lastVerifyNonceByPeer[peer.id], last == tlv.nonceA { return }
+                lastVerifyNonceByPeer[peer.id] = tlv.nonceA
                 // Record inbound challenge time keyed by stable fingerprint if available
-                if let fp = getFingerprint(for: Peer(str: peerID)) {
+                if let fp = getFingerprint(for: peer) {
                     lastInboundVerifyChallengeAt[fp] = Date()
                     // If we've already verified this fingerprint locally, treat this as mutual and toast immediately (responder side)
                     if verifiedFingerprints.contains(fp) {
@@ -4493,37 +4493,37 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         let last = lastMutualToastAt[fp] ?? .distantPast
                         if now.timeIntervalSince(last) > 60 { // 1-minute throttle
                             lastMutualToastAt[fp] = now
-                            let name = unifiedPeerService.getPeer(by: peerID)?.nickname ?? resolveNickname(for: peerID)
+                            let name = unifiedPeerService.getPeer(by: peer.id)?.nickname ?? resolveNickname(for: peer.id)
                             NotificationService.shared.sendLocalNotification(
                                 title: "Mutual verification",
                                 body: "You and \(name) verified each other",
-                                identifier: "verify-mutual-\(peerID)-\(UUID().uuidString)"
+                                identifier: "verify-mutual-\(peer.id)-\(UUID().uuidString)"
                             )
                         }
                     }
                 }
-                meshService.sendVerifyResponse(to: Peer(str: peerID), noiseKeyHex: tlv.noiseKeyHex, nonceA: tlv.nonceA)
+                meshService.sendVerifyResponse(to: peer, noiseKeyHex: tlv.noiseKeyHex, nonceA: tlv.nonceA)
                 // Silent response: no toast needed on responder
             case .verifyResponse:
                 guard let resp = VerificationService.shared.parseVerifyResponse(payload) else { return }
                 // Check pending for this peer
-                guard let pending = pendingQRVerifications[peerID] else { return }
+                guard let pending = pendingQRVerifications[peer.id] else { return }
                 guard resp.noiseKeyHex.lowercased() == pending.noiseKeyHex.lowercased(), resp.nonceA == pending.nonceA else { return }
                 // Verify signature with expected sign key
                 let ok = VerificationService.shared.verifyResponseSignature(noiseKeyHex: resp.noiseKeyHex, nonceA: resp.nonceA, signature: resp.signature, signerPublicKeyHex: pending.signKeyHex)
                 if ok {
-                    pendingQRVerifications.removeValue(forKey: peerID)
-                    if let fp = getFingerprint(for: Peer(str: peerID)) {
+                    pendingQRVerifications.removeValue(forKey: peer.id)
+                    if let fp = getFingerprint(for: peer) {
                         let short = fp.prefix(8)
                         SecureLogger.info("🔐 Marking verified fingerprint: \(short)", category: .security)
                         identityManager.setVerified(fingerprint: fp, verified: true)
                         identityManager.forceSave()
                         verifiedFingerprints.insert(fp)
-                        let name = unifiedPeerService.getPeer(by: peerID)?.nickname ?? resolveNickname(for: peerID)
+                        let name = unifiedPeerService.getPeer(by: peer.id)?.nickname ?? resolveNickname(for: peer.id)
                         NotificationService.shared.sendLocalNotification(
                             title: "Verified",
                             body: "You verified \(name)",
-                            identifier: "verify-success-\(peerID)-\(UUID().uuidString)"
+                            identifier: "verify-success-\(peer.id)-\(UUID().uuidString)"
                         )
                         // If we also recently responded to their challenge, flag mutual and toast (initiator side)
                         if let t = lastInboundVerifyChallengeAt[fp], Date().timeIntervalSince(t) < 600 {
@@ -4534,11 +4534,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 NotificationService.shared.sendLocalNotification(
                                     title: "Mutual verification",
                                     body: "You and \(name) verified each other",
-                                    identifier: "verify-mutual-\(peerID)-\(UUID().uuidString)"
+                                    identifier: "verify-mutual-\(peer.id)-\(UUID().uuidString)"
                                 )
                             }
                         }
-                        updateEncryptionStatus(for: peerID)
+                        updateEncryptionStatus(for: peer.id)
                     }
                 }
             }

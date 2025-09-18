@@ -1827,27 +1827,27 @@ final class BLEService: NSObject {
             case .privateMessage:
                 let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
                 notifyUI { [weak self] in
-                    self?.delegate?.didReceiveNoisePayload(from: peer.id, type: .privateMessage, payload: Data(payloadData), timestamp: ts)
+                    self?.delegate?.didReceiveNoisePayload(from: peer, type: .privateMessage, payload: Data(payloadData), timestamp: ts)
                 }
             case .delivered:
                 let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
                 notifyUI { [weak self] in
-                    self?.delegate?.didReceiveNoisePayload(from: peer.id, type: .delivered, payload: Data(payloadData), timestamp: ts)
+                    self?.delegate?.didReceiveNoisePayload(from: peer, type: .delivered, payload: Data(payloadData), timestamp: ts)
                 }
             case .readReceipt:
                 let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
                 notifyUI { [weak self] in
-                    self?.delegate?.didReceiveNoisePayload(from: peer.id, type: .readReceipt, payload: Data(payloadData), timestamp: ts)
+                    self?.delegate?.didReceiveNoisePayload(from: peer, type: .readReceipt, payload: Data(payloadData), timestamp: ts)
                 }
             case .verifyChallenge:
                 let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
                 notifyUI { [weak self] in
-                    self?.delegate?.didReceiveNoisePayload(from: peer.id, type: .verifyChallenge, payload: Data(payloadData), timestamp: ts)
+                    self?.delegate?.didReceiveNoisePayload(from: peer, type: .verifyChallenge, payload: Data(payloadData), timestamp: ts)
                 }
             case .verifyResponse:
                 let ts = Date(timeIntervalSince1970: Double(packet.timestamp) / 1000)
                 notifyUI { [weak self] in
-                    self?.delegate?.didReceiveNoisePayload(from: peer.id, type: .verifyResponse, payload: Data(payloadData), timestamp: ts)
+                    self?.delegate?.didReceiveNoisePayload(from: peer, type: .verifyResponse, payload: Data(payloadData), timestamp: ts)
                 }
             default:
                 SecureLogger.warning("⚠️ Unknown noise payload type: \(payloadType)")

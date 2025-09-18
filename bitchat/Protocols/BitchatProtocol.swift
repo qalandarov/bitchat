@@ -171,7 +171,7 @@ protocol BitchatDelegate: AnyObject {
     func didUpdateMessageDeliveryStatus(_ messageID: String, status: DeliveryStatus)
 
     // Low-level events for better separation of concerns
-    func didReceiveNoisePayload(from peerID: String, type: NoisePayloadType, payload: Data, timestamp: Date)
+    func didReceiveNoisePayload(from peer: Peer, type: NoisePayloadType, payload: Data, timestamp: Date)
     func didReceivePublicMessage(from peerID: String, nickname: String, content: String, timestamp: Date)
 }
 
@@ -185,7 +185,7 @@ extension BitchatDelegate {
         // Default empty implementation
     }
 
-    func didReceiveNoisePayload(from peerID: String, type: NoisePayloadType, payload: Data, timestamp: Date) {
+    func didReceiveNoisePayload(from peer: Peer, type: NoisePayloadType, payload: Data, timestamp: Date) {
         // Default empty implementation
     }
 
