@@ -2241,7 +2241,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Determine routing method and recipient nickname
         guard let noiseKey = Data(hexString: peerID) else { return }
-        let isConnected = meshService.isPeerConnected(peerID)
+        let isConnected = meshService.isPeerConnected(Peer(str: peerID))
         let isReachable = meshService.isPeerReachable(peerID)
         let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey)
         let isMutualFavorite = favoriteStatus?.isMutual ?? false
@@ -4714,7 +4714,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 self.networkResetTimer = nil
                 // Count mesh peers that are connected OR recently reachable via mesh relays
                 let meshPeers = peers.filter { peerID in
-                    self.meshService.isPeerConnected(peerID) || self.meshService.isPeerReachable(peerID)
+                    self.meshService.isPeerConnected(Peer(str: peerID)) || self.meshService.isPeerReachable(peerID)
                 }
                 
                 // Rising-edge only: previously zero peers, now > 0 peers
@@ -5674,7 +5674,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Try mesh first for connected peers
-        if meshService.isPeerConnected(peerID) {
+        if meshService.isPeerConnected(Peer(str: peerID)) {
             messageRouter.sendFavoriteNotification(to: Peer(str: peerID), isFavorite: isFavorite)
             SecureLogger.debug("📤 Sent favorite notification via BLE to \(peerID)", category: .session)
         } else if let key = noiseKey {

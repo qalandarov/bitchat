@@ -28,7 +28,7 @@ protocol Transport: AnyObject {
     func emergencyDisconnectAll()
 
     // Connectivity and peers
-    func isPeerConnected(_ peerID: String) -> Bool
+    func isPeerConnected(_ peer: Peer) -> Bool
     func isPeerReachable(_ peerID: String) -> Bool
     func peerNickname(peerID: String) -> String?
     func getPeerNicknames() -> [String: String]

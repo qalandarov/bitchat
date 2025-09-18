@@ -554,9 +554,9 @@ final class BLEService: NSObject {
         }
     }
     
-    func isPeerConnected(_ peerID: String) -> Bool {
+    func isPeerConnected(_ peer: Peer) -> Bool {
         // Accept both 16-hex short IDs and 64-hex Noise keys
-        let shortID = Peer(str: peerID).toShort().id
+        let shortID = peer.toShort().id
         return collectionsQueue.sync { peerInfos[shortID]?.isConnected ?? false }
     }
 

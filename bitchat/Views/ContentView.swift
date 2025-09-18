@@ -1448,7 +1448,7 @@ struct ContentView: View {
                                     .font(.system(size: 14))
                                     .foregroundColor(.purple)
                                     .accessibilityLabel("Available via Nostr")
-                            } else if viewModel.meshService.isPeerConnected(headerPeerID) || viewModel.connectedPeers.contains(headerPeerID) {
+                            } else if viewModel.meshService.isPeerConnected(Peer(str: headerPeerID)) || viewModel.connectedPeers.contains(headerPeerID) {
                                 // Fallback: if peer lookup is missing but mesh reports connected, show radio
                                 Image(systemName: "dot.radiowaves.left.and.right")
                                     .font(.system(size: 14))
