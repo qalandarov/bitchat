@@ -456,7 +456,7 @@ struct ContentView: View {
                     selectedMessageSender = viewModel.geohashDisplayName(for: peerID)
                 } else {
                     // Mesh sender: use current mesh nickname if available; otherwise fall back to last non-system message
-                    if let name = viewModel.meshService.peerNickname(peerID: peerID) {
+                    if let name = viewModel.meshService.peerNickname(peer: Peer(str: peerID)) {
                         selectedMessageSender = name
                     } else {
                         selectedMessageSender = viewModel.messages.last(where: { $0.senderPeer?.id == peerID && $0.sender != "system" })?.sender
@@ -1366,7 +1366,7 @@ struct ContentView: View {
             // Try mesh/unified peer display
             if let name = peer?.displayName { return name }
             // Try direct mesh nickname (connected-only)
-            if let name = viewModel.meshService.peerNickname(peerID: headerPeerID) { return name }
+            if let name = viewModel.meshService.peerNickname(peer: Peer(str: headerPeerID)) { return name }
             // Try favorite nickname by stable Noise key
             if let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: Data(hexString: headerPeerID) ?? Data()),
                !fav.peerNickname.isEmpty { return fav.peerNickname }

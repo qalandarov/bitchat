@@ -38,7 +38,7 @@ final class NostrTransport: Transport {
 
     func isPeerConnected(_ peer: Peer) -> Bool { false }
     func isPeerReachable(_ peer: Peer) -> Bool { false }
-    func peerNickname(peerID: String) -> String? { nil }
+    func peerNickname(peer: Peer) -> String? { nil }
     func getPeerNicknames() -> [String : String] { [:] }
 
     func getFingerprint(for peerID: String) -> String? { nil }

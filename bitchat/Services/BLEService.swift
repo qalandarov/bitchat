@@ -576,9 +576,9 @@ final class BLEService: NSObject {
         }
     }
 
-    func peerNickname(peerID: String) -> String? {
+    func peerNickname(peer: Peer) -> String? {
         collectionsQueue.sync {
-            guard let peerInfo = peerInfos[peerID], peerInfo.isConnected else { return nil }
+            guard let peerInfo = peerInfos[peer.id], peerInfo.isConnected else { return nil }
             return peerInfo.nickname
         }
     }
