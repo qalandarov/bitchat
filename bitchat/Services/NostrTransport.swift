@@ -139,9 +139,9 @@ final class NostrTransport: Transport {
         }
     }
 
-    func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {
+    func sendFavoriteNotification(to peer: Peer, isFavorite: Bool) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             let content = isFavorite ? "[FAVORITED]:\(senderIdentity.npub)" : "[UNFAVORITED]:\(senderIdentity.npub)"
             SecureLogger.debug("NostrTransport: preparing FAVORITE(\(isFavorite)) to \(recipientNpub.prefix(16))…", category: .session)
@@ -152,7 +152,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peerID, senderPeerID: senderPeerID) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
                 SecureLogger.error("NostrTransport: failed to embed favorite notification", category: .session)
                 return
             }
@@ -182,9 +182,9 @@ final class NostrTransport: Transport {
     }
 
     func sendBroadcastAnnounce() { /* no-op for Nostr */ }
-    func sendDeliveryAck(for messageID: String, to peerID: String) {
+    func sendDeliveryAck(for messageID: String, to peer: Peer) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
             SecureLogger.debug("NostrTransport: preparing DELIVERED ack for id=\(messageID.prefix(8))… to \(recipientNpub.prefix(16))…", category: .session)
             let recipientHex: String
@@ -193,7 +193,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
-            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: messageID, recipientPeerID: peerID, senderPeerID: senderPeerID) else {
+            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
                 SecureLogger.error("NostrTransport: failed to embed DELIVERED ack", category: .session)
                 return
             }

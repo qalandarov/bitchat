@@ -43,9 +43,9 @@ protocol Transport: AnyObject {
     func sendMessage(_ content: String, mentions: [String])
     func sendPrivateMessage(_ content: String, to peer: Peer, recipientNickname: String, messageID: String)
     func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer)
-    func sendFavoriteNotification(to peerID: String, isFavorite: Bool)
+    func sendFavoriteNotification(to peer: Peer, isFavorite: Bool)
     func sendBroadcastAnnounce()
-    func sendDeliveryAck(for messageID: String, to peerID: String)
+    func sendDeliveryAck(for messageID: String, to peer: Peer)
 
     // QR verification (optional for transports)
     func sendVerifyChallenge(to peerID: String, noiseKeyHex: String, nonceA: Data)

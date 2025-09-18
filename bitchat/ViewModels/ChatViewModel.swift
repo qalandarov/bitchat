@@ -4456,7 +4456,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             )
                 handlePrivateMessage(msg)
                 // Send delivery ACK back over BLE
-                meshService.sendDeliveryAck(for: pm.messageID, to: peerID)
+                meshService.sendDeliveryAck(for: pm.messageID, to: Peer(str: peerID))
 
             case .delivered:
                 guard let messageID = String(data: payload, encoding: .utf8) else { return }

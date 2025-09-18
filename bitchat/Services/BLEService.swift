@@ -595,8 +595,8 @@ final class BLEService: NSObject {
         sendPrivateMessage(content, to: recipient.id, messageID: messageID)
     }
     
-    func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {
-        SecureLogger.debug("🔔 sendFavoriteNotification called - peerID: \(peerID), isFavorite: \(isFavorite)", category: .session)
+    func sendFavoriteNotification(to peer: Peer, isFavorite: Bool) {
+        SecureLogger.debug("🔔 sendFavoriteNotification called - peerID: \(peer.id), isFavorite: \(isFavorite)", category: .session)
         
         // Include Nostr public key in the notification
         var content = isFavorite ? "[FAVORITED]" : "[UNFAVORITED]"
@@ -607,8 +607,8 @@ final class BLEService: NSObject {
             SecureLogger.debug("📝 Sending favorite notification with Nostr npub: \(myNostrIdentity.npub)", category: .session)
         }
         
-        SecureLogger.debug("📤 Sending favorite notification to \(peerID): \(content)", category: .session)
-        sendPrivateMessage(content, to: peerID, messageID: UUID().uuidString)
+        SecureLogger.debug("📤 Sending favorite notification to \(peer.id): \(content)", category: .session)
+        sendPrivateMessage(content, to: peer.id, messageID: UUID().uuidString)
     }
     
     func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer) {
@@ -1970,18 +1970,18 @@ final class BLEService: NSObject {
         gossipSyncManager?.onPublicPacketSeen(signedPacket)
     }
     
-    func sendDeliveryAck(for messageID: String, to peerID: String) {
+    func sendDeliveryAck(for messageID: String, to peer: Peer) {
         // Create typed payload: [type byte] + [message ID]
         var payload = Data([NoisePayloadType.delivered.rawValue])
         payload.append(contentsOf: messageID.utf8)
 
-        if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
+        if noiseService.hasEstablishedSession(with: peer) {
             do {
-                let encrypted = try noiseService.encrypt(payload, for: Peer(str: peerID))
+                let encrypted = try noiseService.encrypt(payload, for: peer)
                 let packet = BitchatPacket(
                     type: MessageType.noiseEncrypted.rawValue,
                     senderID: myPeerIDData,
-                    recipientID: Data(hexString: peerID),
+                    recipientID: Data(hexString: peer.id),
                     timestamp: UInt64(Date().timeIntervalSince1970 * 1000),
                     payload: encrypted,
                     signature: nil,
@@ -1995,10 +1995,10 @@ final class BLEService: NSObject {
             // Queue for after handshake and initiate if needed
             collectionsQueue.async(flags: .barrier) { [weak self] in
                 guard let self = self else { return }
-                self.pendingNoisePayloadsAfterHandshake[peerID, default: []].append(payload)
+                self.pendingNoisePayloadsAfterHandshake[peer.id, default: []].append(payload)
             }
-            if !noiseService.hasSession(with: Peer(str: peerID)) { initiateNoiseHandshake(with: peerID) }
-            SecureLogger.debug("🕒 Queued DELIVERED ack for \(peerID) until handshake completes", category: .session)
+            if !noiseService.hasSession(with: peer) { initiateNoiseHandshake(with: peer.id) }
+            SecureLogger.debug("🕒 Queued DELIVERED ack for \(peer.id) until handshake completes", category: .session)
         }
     }
 

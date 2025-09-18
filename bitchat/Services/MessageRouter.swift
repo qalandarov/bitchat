@@ -68,18 +68,18 @@ final class MessageRouter {
     func sendDeliveryAck(_ messageID: String, to peer: Peer) {
         if mesh.isPeerReachable(peer) {
             SecureLogger.debug("Routing DELIVERED ack via mesh (reachable) to \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-            mesh.sendDeliveryAck(for: messageID, to: peer.id)
+            mesh.sendDeliveryAck(for: messageID, to: peer)
         } else {
-            nostr.sendDeliveryAck(for: messageID, to: peer.id)
+            nostr.sendDeliveryAck(for: messageID, to: peer)
         }
     }
 
     func sendFavoriteNotification(to peer: Peer, isFavorite: Bool) {
         // Route via mesh when connected; else use Nostr
         if mesh.isPeerConnected(peer) {
-            mesh.sendFavoriteNotification(to: peer.id, isFavorite: isFavorite)
+            mesh.sendFavoriteNotification(to: peer, isFavorite: isFavorite)
         } else {
-            nostr.sendFavoriteNotification(to: peer.id, isFavorite: isFavorite)
+            nostr.sendFavoriteNotification(to: peer, isFavorite: isFavorite)
         }
     }
 

@@ -310,7 +310,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             router.sendFavoriteNotification(to: Peer(str: peerID), isFavorite: !wasFavorite)
         } else {
             // Fallback to mesh-only if router not yet wired
-            meshService.sendFavoriteNotification(to: peerID, isFavorite: !wasFavorite)
+            meshService.sendFavoriteNotification(to: Peer(str: peerID), isFavorite: !wasFavorite)
         }
         
         // Force update of peers to reflect the change
