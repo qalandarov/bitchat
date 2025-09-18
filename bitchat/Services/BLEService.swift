@@ -46,7 +46,7 @@ final class BLEService: NSObject {
     
     // 2. BLE Centrals (when acting as peripheral)
     private var subscribedCentrals: [CBCentral] = []
-    private var centralToPeerID: [String: String] = [:]  // Central UUID -> Peer ID mapping
+    private var centralToPeer: [String: Peer] = [:]  // Central UUID -> Peer mapping
     
     // 3. Peer Information (single source of truth)
     private struct PeerInfo {
@@ -180,11 +180,11 @@ final class BLEService: NSObject {
             return bleQueue.sync { Array(peripherals.values) }
         }
     }
-    private func snapshotSubscribedCentrals() -> ([CBCentral], [String: String]) {
+    private func snapshotSubscribedCentrals() -> ([CBCentral], [String: Peer]) {
         if DispatchQueue.getSpecific(key: bleQueueKey) != nil {
-            return (self.subscribedCentrals, self.centralToPeerID)
+            return (self.subscribedCentrals, self.centralToPeer)
         } else {
-            return bleQueue.sync { (self.subscribedCentrals, self.centralToPeerID) }
+            return bleQueue.sync { (self.subscribedCentrals, self.centralToPeer) }
         }
     }
 
@@ -735,7 +735,7 @@ final class BLEService: NSObject {
         peripherals.removeAll()
         peerToPeripheralUUID.removeAll()
         subscribedCentrals.removeAll()
-        centralToPeerID.removeAll()
+        centralToPeer.removeAll()
     }
 
     func resetIdentityForPanic(currentNickname: String) {
@@ -1044,7 +1044,7 @@ final class BLEService: NSObject {
         var centralMaxLen: Int?
         do {
             let (centrals, mapping) = snapshotSubscribedCentrals()
-            if let central = centrals.first(where: { mapping[$0.identifier.uuidString] == recipientPeerID }) {
+            if let central = centrals.first(where: { mapping[$0.identifier.uuidString]?.id == recipientPeerID }) {
                 centralMaxLen = central.maximumUpdateValueLength
             }
         }
@@ -1073,7 +1073,7 @@ final class BLEService: NSObject {
         // Notify via central link (dual-role)
         if let characteristic = characteristic, !sentEncrypted {
             let (centrals, mapping) = snapshotSubscribedCentrals()
-            for central in centrals where mapping[central.identifier.uuidString] == recipientPeerID {
+            for central in centrals where mapping[central.identifier.uuidString]?.id == recipientPeerID {
                 let success = peripheralManager?.updateValue(data, for: characteristic, onSubscribedCentrals: [central]) ?? false
                 if success { sentEncrypted = true; break }
                 collectionsQueue.async(flags: .barrier) { [weak self] in
@@ -1546,7 +1546,7 @@ final class BLEService: NSObject {
             
             // Check if this peer is subscribed to us as a central
             // Note: We can't identify which specific central is which peer without additional mapping
-            let hasCentralSubscription = centralToPeerID.values.contains(peerID)
+            let hasCentralSubscription = centralToPeer.values.map(\.id).contains(peerID)
             
             // Direct announces arrive with full TTL (no prior hop)
             let isDirectAnnounce = (packet.ttl == messageTTL)
@@ -1766,7 +1766,7 @@ final class BLEService: NSObject {
         let hasDirectLink: Bool = collectionsQueue.sync {
             let perUUID = peerToPeripheralUUID[peerID]
             let perConnected = perUUID != nil && peripherals[perUUID!]?.isConnected == true
-            let hasCentral = centralToPeerID.values.contains(peerID)
+            let hasCentral = centralToPeer.values.map(\.id).contains(peerID)
             return perConnected || hasCentral
         }
 
@@ -2181,7 +2181,7 @@ final class BLEService: NSObject {
                     // Check if we still have an active BLE connection to this peer
                     let hasPeripheralConnection = peerToPeripheralUUID[peerID] != nil &&
                                                  peripherals[peerToPeripheralUUID[peerID]!]?.isConnected == true
-                    let hasCentralConnection = centralToPeerID.values.contains(peerID)
+                    let hasCentralConnection = centralToPeer.values.map(\.id).contains(peerID)
                     
                     // If direct link is gone, mark as not connected (retain entry for reachability)
                     if !hasPeripheralConnection && !hasCentralConnection {
@@ -2997,7 +2997,7 @@ extension BLEService: CBPeripheralManagerDelegate {
         
         // Find and disconnect the peer associated with this central
         let centralUUID = central.identifier.uuidString
-        if let peerID = centralToPeerID[centralUUID] {
+        if let peerID = centralToPeer[centralUUID]?.id {
             // Mark peer as not connected; retain for reachability
             collectionsQueue.sync(flags: .barrier) {
                 if var info = peerInfos[peerID] {
@@ -3007,7 +3007,7 @@ extension BLEService: CBPeripheralManagerDelegate {
             }
             
             // Clean up mappings
-            centralToPeerID.removeValue(forKey: centralUUID)
+            centralToPeer.removeValue(forKey: centralUUID)
             
             // Update UI immediately
             notifyUI { [weak self] in
@@ -3124,7 +3124,7 @@ extension BLEService: CBPeripheralManagerDelegate {
                     subscribedCentrals.append(sorted[0].central)
                 }
                 if packet.type == MessageType.announce.rawValue {
-                    if packet.ttl == messageTTL { centralToPeerID[centralUUID] = senderID }
+                    if packet.ttl == messageTTL { centralToPeer[centralUUID] = Peer(str: senderID) }
                     // Record ingress link for last-hop suppression then process
                     let msgID = makeMessageID(for: packet)
                     collectionsQueue.async(flags: .barrier) { [weak self] in
