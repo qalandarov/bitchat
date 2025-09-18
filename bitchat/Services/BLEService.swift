@@ -1640,7 +1640,7 @@ final class BLEService: NSObject {
             }
             
             self.requestPeerDataPublish()
-            self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
+            self.delegate?.didUpdatePeerList(currentPeers)
         }
         
         // Track for sync (include our own and others' announces)
@@ -1879,7 +1879,7 @@ final class BLEService: NSObject {
             let currentPeers = self.collectionsQueue.sync { Array(self.peerInfos.keys) }
             
             self.delegate?.didDisconnectFromPeer(peer)
-            self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
+            self.delegate?.didUpdatePeerList(currentPeers)
         }
     }
     
@@ -2203,7 +2203,7 @@ final class BLEService: NSObject {
                 }
                 // Publish snapshots so UnifiedPeerService updates connection/reachability icons
                 self.requestPeerDataPublish()
-                self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
+                self.delegate?.didUpdatePeerList(currentPeers)
             }
         }
     }
@@ -2605,7 +2605,7 @@ func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeriph
                 self.notifyPeerDisconnectedDebounced(peer)
             }
             self.requestPeerDataPublish()
-            self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
+            self.delegate?.didUpdatePeerList(currentPeers)
         }
     }
     
@@ -3005,7 +3005,7 @@ extension BLEService: CBPeripheralManagerDelegate {
                 self.notifyPeerDisconnectedDebounced(peer)
                 // Publish snapshots so UnifiedPeerService can refresh icons promptly
                 self.requestPeerDataPublish()
-                self.delegate?.didUpdatePeerList(currentPeers.map(\.id))
+                self.delegate?.didUpdatePeerList(currentPeers)
             }
         }
     }

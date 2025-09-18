@@ -163,7 +163,7 @@ protocol BitchatDelegate: AnyObject {
     func didReceiveMessage(_ message: BitchatMessage)
     func didConnectToPeer(_ peer: Peer)
     func didDisconnectFromPeer(_ peer: Peer)
-    func didUpdatePeerList(_ peers: [String])
+    func didUpdatePeerList(_ peers: [Peer])
     
     // Optional method to check if a fingerprint belongs to a favorite peer
     func isFavorite(fingerprint: String) -> Bool

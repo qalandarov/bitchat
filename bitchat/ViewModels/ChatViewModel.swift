@@ -4695,7 +4695,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         //
     }
     
-    func didUpdatePeerList(_ peers: [String]) {
+    func didUpdatePeerList(_ peers: [Peer]) {
         // UI updates must run on the main thread.
         // The delegate callback is not guaranteed to be on the main thread.
         DispatchQueue.main.async {
@@ -4712,12 +4712,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 self.networkResetTimer?.invalidate()
                 self.networkResetTimer = nil
                 // Count mesh peers that are connected OR recently reachable via mesh relays
-                let meshPeers = peers.filter { peerID in
-                    self.meshService.isPeerConnected(Peer(str: peerID)) || self.meshService.isPeerReachable(Peer(str: peerID))
+                let meshPeers = peers.filter { peer in
+                    self.meshService.isPeerConnected(peer) || self.meshService.isPeerReachable(peer)
                 }
                 
                 // Rising-edge only: previously zero peers, now > 0 peers
-                let currentPeerSet = Set(meshPeers)
+                let currentPeerSet = Set(meshPeers.map(\.id))
                 let hadNone = self.recentlySeenPeers.isEmpty
                 if meshPeers.count > 0 && hadNone && !self.hasNotifiedNetworkAvailable {
                     self.hasNotifiedNetworkAvailable = true
@@ -4738,8 +4738,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
             
             // Register ephemeral sessions for all connected peers
-            for peerID in peers {
-                self.identityManager.registerEphemeralSession(peer: Peer(str: peerID), handshakeState: .none)
+            for peer in peers {
+                self.identityManager.registerEphemeralSession(peer: peer, handshakeState: .none)
             }
             
             // Schedule UI refresh to ensure offline favorites are shown
