@@ -264,7 +264,7 @@ final class NoiseEncryptionService {
     
     /// Get peer's public key data
     func getPeerPublicKeyData(_ peer: Peer) -> Data? {
-        return sessionManager.getRemoteStaticKey(for: peer.id)?.rawRepresentation
+        return sessionManager.getRemoteStaticKey(for: peer)?.rawRepresentation
     }
     
     /// Clear persistent identity (for panic mode)
@@ -409,7 +409,7 @@ final class NoiseEncryptionService {
         
         // Return raw handshake data without wrapper
         // The Noise protocol handles its own message format
-        let handshakeData = try sessionManager.initiateHandshake(with: peer.id)
+        let handshakeData = try sessionManager.initiateHandshake(with: peer)
         return handshakeData
     }
     
@@ -436,7 +436,7 @@ final class NoiseEncryptionService {
         
         // For handshakes, we process the raw data directly without NoiseMessage wrapper
         // The Noise protocol handles its own message format
-        let responsePayload = try sessionManager.handleIncomingHandshake(from: peer.id, message: message)
+        let responsePayload = try sessionManager.handleIncomingHandshake(from: peer, message: message)
         
         
         // Return raw response without wrapper
@@ -445,12 +445,12 @@ final class NoiseEncryptionService {
     
     /// Check if we have an established session with a peer
     func hasEstablishedSession(with peer: Peer) -> Bool {
-        return sessionManager.getSession(for: peer.id)?.isEstablished() ?? false
+        return sessionManager.getSession(for: peer)?.isEstablished() ?? false
     }
     
     /// Check if we have a session (established or handshaking) with a peer
     func hasSession(with peer: Peer) -> Bool {
-        return sessionManager.getSession(for: peer.id) != nil
+        return sessionManager.getSession(for: peer) != nil
     }
     
     // MARK: - Encryption/Decryption
@@ -474,7 +474,7 @@ final class NoiseEncryptionService {
             throw NoiseEncryptionError.handshakeRequired
         }
         
-        return try sessionManager.encrypt(data, for: peer.id)
+        return try sessionManager.encrypt(data, for: peer)
     }
     
     /// Decrypt data from a specific peer
@@ -494,7 +494,7 @@ final class NoiseEncryptionService {
             throw NoiseEncryptionError.sessionNotEstablished
         }
         
-        return try sessionManager.decrypt(data, from: peer.id)
+        return try sessionManager.decrypt(data, from: peer)
     }
     
     // MARK: - Peer Management
@@ -515,7 +515,7 @@ final class NoiseEncryptionService {
     
     /// Remove a peer session
     func removePeer(_ peer: Peer) {
-        sessionManager.removeSession(for: peer.id)
+        sessionManager.removeSession(for: peer)
         
         serviceQueue.sync(flags: .barrier) {
             if let fingerprint = peerFingerprints[peer] {
@@ -580,17 +580,17 @@ final class NoiseEncryptionService {
     private func checkSessionsForRekey() {
         let sessionsNeedingRekey = sessionManager.getSessionsNeedingRekey()
         
-        for (peerID, needsRekey) in sessionsNeedingRekey where needsRekey {
+        for (peer, needsRekey) in sessionsNeedingRekey where needsRekey {
             
             // Attempt to rekey the session
             do {
-                try sessionManager.initiateRekey(for: peerID)
-                SecureLogger.debug("Key rotation initiated for peer: \(peerID)", category: .security)
+                try sessionManager.initiateRekey(for: peer)
+                SecureLogger.debug("Key rotation initiated for peer: \(peer.id)", category: .security)
                 
                 // Signal that handshake is needed
-                onHandshakeRequired?(peerID)
+                onHandshakeRequired?(peer.id)
             } catch {
-                SecureLogger.error(error, context: "Failed to initiate rekey for peer: \(peerID)", category: .session)
+                SecureLogger.error(error, context: "Failed to initiate rekey for peer: \(peer.id)", category: .session)
             }
         }
     }
