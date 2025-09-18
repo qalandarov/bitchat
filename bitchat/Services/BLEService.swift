@@ -705,10 +705,10 @@ final class BLEService: NSObject {
     // Transport compatibility: generic naming
     
     
-    func getNoiseSessionState(for peerID: String) -> LazyHandshakeState {
-        if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
+    func getNoiseSessionState(for peer: Peer) -> LazyHandshakeState {
+        if noiseService.hasEstablishedSession(with: peer) {
             return .established
-        } else if noiseService.hasSession(with: Peer(str: peerID)) {
+        } else if noiseService.hasSession(with: peer) {
             return .handshaking
         } else {
             return .none

@@ -2619,7 +2619,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Trigger handshake if needed (mesh peers only). Skip for Nostr geohash conv keys.
         if !peerID.hasPrefix("nostr_") && !peerID.hasPrefix("nostr:") {
-            let sessionState = meshService.getNoiseSessionState(for: peerID)
+            let sessionState = meshService.getNoiseSessionState(for: Peer(str: peerID))
             switch sessionState {
             case .none, .failed:
                 meshService.triggerHandshake(with: peerID)
@@ -2862,7 +2862,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             if let peerNickname = meshService.peerNickname(peer: Peer(str: peerID)) {
                 // Only send screenshot notification if we have an established session
                 // This prevents triggering handshake requests for screenshot notifications
-                let sessionState = meshService.getNoiseSessionState(for: peerID)
+                let sessionState = meshService.getNoiseSessionState(for: Peer(str: peerID))
                 switch sessionState {
                 case .established:
                     // Send the message directly without going through sendPrivateMessage to avoid local echo
@@ -3765,7 +3765,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Check if we've ever established a session by looking for a fingerprint
         let hasEverEstablishedSession = getFingerprint(for: Peer(str: peerID)) != nil
         
-        let sessionState = meshService.getNoiseSessionState(for: peerID)
+        let sessionState = meshService.getNoiseSessionState(for: Peer(str: peerID))
         
         let status: EncryptionStatus
         
