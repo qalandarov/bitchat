@@ -591,8 +591,8 @@ final class BLEService: NSObject {
         }
     }
     
-    func sendPrivateMessage(_ content: String, to recipientID: String, recipientNickname: String, messageID: String) {
-        sendPrivateMessage(content, to: recipientID, messageID: messageID)
+    func sendPrivateMessage(_ content: String, to recipient: Peer, recipientNickname: String, messageID: String) {
+        sendPrivateMessage(content, to: recipient.id, messageID: messageID)
     }
     
     func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {

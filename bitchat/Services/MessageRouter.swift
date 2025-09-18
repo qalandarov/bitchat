@@ -42,10 +42,10 @@ final class MessageRouter {
         if reachableMesh {
             SecureLogger.debug("Routing PM via mesh (reachable) to \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             // BLEService will initiate a handshake if needed and queue the message
-            mesh.sendPrivateMessage(content, to: peer.id, recipientNickname: recipientNickname, messageID: messageID)
+            mesh.sendPrivateMessage(content, to: peer, recipientNickname: recipientNickname, messageID: messageID)
         } else if canSendViaNostr(peer: peer) {
             SecureLogger.debug("Routing PM via Nostr to \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-            nostr.sendPrivateMessage(content, to: peer.id, recipientNickname: recipientNickname, messageID: messageID)
+            nostr.sendPrivateMessage(content, to: peer, recipientNickname: recipientNickname, messageID: messageID)
         } else {
             // Queue for later (when mesh connects or Nostr mapping appears)
             if outbox[peer] == nil { outbox[peer] = [] }
@@ -110,10 +110,10 @@ final class MessageRouter {
         for (content, nickname, messageID) in queued {
             if mesh.isPeerReachable(peer) {
                 SecureLogger.debug("Outbox -> mesh for \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                mesh.sendPrivateMessage(content, to: peer.id, recipientNickname: nickname, messageID: messageID)
+                mesh.sendPrivateMessage(content, to: peer, recipientNickname: nickname, messageID: messageID)
             } else if canSendViaNostr(peer: peer) {
                 SecureLogger.debug("Outbox -> Nostr for \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
-                nostr.sendPrivateMessage(content, to: peer.id, recipientNickname: nickname, messageID: messageID)
+                nostr.sendPrivateMessage(content, to: peer, recipientNickname: nickname, messageID: messageID)
             } else {
                 // Keep unsent items queued
                 remaining.append((content, nickname, messageID))

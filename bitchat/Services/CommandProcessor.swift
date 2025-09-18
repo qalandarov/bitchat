@@ -150,7 +150,7 @@ final class CommandProcessor {
             // In private chat
             if let peerNickname = meshService?.peerNickname(peer: Peer(str: targetPeerID)) {
                 let personalMessage = "* \(emoji) \(myNickname) \(action) you\(suffix) *"
-                meshService?.sendPrivateMessage(personalMessage, to: targetPeerID, 
+                meshService?.sendPrivateMessage(personalMessage, to: Peer(str: targetPeerID), 
                                                recipientNickname: peerNickname, 
                                                messageID: UUID().uuidString)
                 // Also add a local system message so the sender sees a natural-language confirmation

@@ -59,11 +59,11 @@ final class NostrTransport: Transport {
     // Public broadcast not supported over Nostr here
     func sendMessage(_ content: String, mentions: [String]) { /* no-op */ }
 
-    func sendPrivateMessage(_ content: String, to peerID: String, recipientNickname: String, messageID: String) {
+    func sendPrivateMessage(_ content: String, to peer: Peer, recipientNickname: String, messageID: String) {
         Task { @MainActor in
-            guard let recipientNpub = resolveRecipientNpub(for: peerID) else { return }
+            guard let recipientNpub = resolveRecipientNpub(for: peer.id) else { return }
             guard let senderIdentity = try? NostrIdentityBridge.getCurrentNostrIdentity() else { return }
-            SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peerID.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
+            SecureLogger.debug("NostrTransport: preparing PM to \(recipientNpub.prefix(16))… for peerID \(peer.id.prefix(8))… id=\(messageID.prefix(8))…", category: .session)
             // Convert recipient npub -> hex (x-only)
             let recipientHex: String
             do {
@@ -77,7 +77,7 @@ final class NostrTransport: Transport {
                 SecureLogger.error("NostrTransport: failed to decode npub -> hex: \(error)", category: .session)
                 return
             }
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: messageID, recipientPeerID: peerID, senderPeerID: senderPeerID) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
                 SecureLogger.error("NostrTransport: failed to embed PM packet", category: .session)
                 return
             }

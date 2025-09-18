@@ -89,7 +89,7 @@ final class PrivateChatManager: ObservableObject {
         }
         
         // Send via mesh service
-        meshService.sendPrivateMessage(content, to: peerID, recipientNickname: peerNickname, messageID: messageID)
+        meshService.sendPrivateMessage(content, to: Peer(str: peerID), recipientNickname: peerNickname, messageID: messageID)
     }
     
     /// Handle incoming private message
