@@ -36,7 +36,7 @@ final class BLEService: NSObject {
     private struct PeripheralState {
         let peripheral: CBPeripheral
         var characteristic: CBCharacteristic?
-        var peerID: String?
+        var peer: Peer?
         var isConnecting: Bool = false
         var isConnected: Bool = false
         var lastConnectionAttempt: Date? = nil
@@ -2502,7 +2502,7 @@ extension BLEService: CBCentralManagerDelegate {
         peripherals[peripheralID] = PeripheralState(
             peripheral: peripheral,
             characteristic: nil,
-            peerID: nil,
+            peer: nil,
             isConnecting: true,
             isConnected: false,
             lastConnectionAttempt: Date()
@@ -2552,7 +2552,7 @@ func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeriph
             peripherals[peripheralID] = PeripheralState(
                 peripheral: peripheral,
                 characteristic: nil,
-                peerID: nil,
+                peer: nil,
                 isConnecting: false,
                 isConnected: true
             )
@@ -2572,7 +2572,7 @@ func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeriph
         let peripheralID = peripheral.identifier.uuidString
         
         // Find the peer ID if we have it
-        let peerID = peripherals[peripheralID]?.peerID
+        let peerID = peripherals[peripheralID]?.peer?.id
         
         SecureLogger.debug("📱 Disconnect: \(peerID ?? peripheralID)\(error != nil ? " (\(error!.localizedDescription))" : "")", category: .session)
 
@@ -2689,7 +2689,7 @@ extension BLEService {
         peripherals[peripheralID] = PeripheralState(
             peripheral: peripheral,
             characteristic: nil,
-            peerID: nil,
+            peer: nil,
             isConnecting: true,
             isConnected: false,
             lastConnectionAttempt: Date()
@@ -2858,7 +2858,7 @@ extension BLEService: CBPeripheralDelegate {
             // Only update mapping if this is a direct announce (TTL == messageTTL means not relayed)
             if packet.ttl == messageTTL {
                 if var state = peripherals[peripheralUUID] {
-                    state.peerID = senderID
+                    state.peer = Peer(str: senderID)
                     peripherals[peripheralUUID] = state
                 }
                 peerToPeripheralUUID[senderID] = peripheralUUID
