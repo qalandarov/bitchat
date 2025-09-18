@@ -4366,7 +4366,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
                 // If a QR verification is pending but not sent yet, send it now that session is authenticated
                 if var pending = self.pendingQRVerifications[peerID], pending.sent == false {
-                    self.meshService.sendVerifyChallenge(to: peerID, noiseKeyHex: pending.noiseKeyHex, nonceA: pending.nonceA)
+                    self.meshService.sendVerifyChallenge(to: Peer(str: peerID), noiseKeyHex: pending.noiseKeyHex, nonceA: pending.nonceA)
                     pending.sent = true
                     self.pendingQRVerifications[peerID] = pending
                     SecureLogger.debug("📤 Sent deferred verify challenge to \(peerID) after handshake", category: .security)
@@ -4588,7 +4588,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // If Noise session is established, send immediately; otherwise trigger handshake and send on auth
         let noise = meshService.getNoiseService()
         if noise.hasEstablishedSession(with: Peer(str: peerID)) {
-            meshService.sendVerifyChallenge(to: peerID, noiseKeyHex: qr.noiseKeyHex, nonceA: nonce)
+            meshService.sendVerifyChallenge(to: Peer(str: peerID), noiseKeyHex: qr.noiseKeyHex, nonceA: nonce)
             pending.sent = true
             pendingQRVerifications[peerID] = pending
         } else {

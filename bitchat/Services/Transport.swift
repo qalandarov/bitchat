@@ -48,7 +48,7 @@ protocol Transport: AnyObject {
     func sendDeliveryAck(for messageID: String, to peer: Peer)
 
     // QR verification (optional for transports)
-    func sendVerifyChallenge(to peerID: String, noiseKeyHex: String, nonceA: Data)
+    func sendVerifyChallenge(to peer: Peer, noiseKeyHex: String, nonceA: Data)
     func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data)
 
     // Peer snapshots (for non-UI services)
@@ -57,7 +57,7 @@ protocol Transport: AnyObject {
 }
 
 extension Transport {
-    func sendVerifyChallenge(to peerID: String, noiseKeyHex: String, nonceA: Data) {}
+    func sendVerifyChallenge(to peer: Peer, noiseKeyHex: String, nonceA: Data) {}
     func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data) {}
 }
 

@@ -653,9 +653,9 @@ final class BLEService: NSObject {
     }
 
     // MARK: - QR Verification over Noise
-    func sendVerifyChallenge(to peerID: String, noiseKeyHex: String, nonceA: Data) {
+    func sendVerifyChallenge(to peer: Peer, noiseKeyHex: String, nonceA: Data) {
         let payload = VerificationService.shared.buildVerifyChallenge(noiseKeyHex: noiseKeyHex, nonceA: nonceA)
-        sendNoisePayload(payload, to: peerID)
+        sendNoisePayload(payload, to: peer.id)
     }
 
     func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data) {
