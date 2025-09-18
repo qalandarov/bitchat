@@ -31,7 +31,7 @@ protocol Transport: AnyObject {
     func isPeerConnected(_ peer: Peer) -> Bool
     func isPeerReachable(_ peer: Peer) -> Bool
     func peerNickname(peer: Peer) -> String?
-    func getPeerNicknames() -> [String: String]
+    func getPeerNicknames() -> [Peer: String]
 
     // Protocol utilities
     func getFingerprint(for peer: Peer) -> String?

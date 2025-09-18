@@ -301,13 +301,13 @@ final class BLEService: NSObject {
         collectionsQueue.sync {
             let snapshot = Array(peerInfos.values)
             let resolvedNames = PeerDisplayNameResolver.resolve(
-                snapshot.map { ($0.id, $0.nickname, $0.isConnected) },
+                snapshot.map { (Peer(str: $0.id), $0.nickname, $0.isConnected) },
                 selfNickname: myNickname
             )
             return snapshot.map { info in
                 TransportPeerSnapshot(
                     id: info.id,
-                    nickname: resolvedNames[info.id] ?? info.nickname,
+                    nickname: resolvedNames[Peer(str: info.id)] ?? info.nickname,
                     isConnected: info.isConnected,
                     noisePublicKey: info.noisePublicKey,
                     lastSeen: info.lastSeen
@@ -583,7 +583,7 @@ final class BLEService: NSObject {
         }
     }
 
-    func getPeerNicknames() -> [String: String] {
+    func getPeerNicknames() -> [Peer: String] {
         return collectionsQueue.sync {
             let connected = peerInfos.filter { $0.value.isConnected }
             let tuples = connected.map { ($0.key, $0.value.nickname, true) }

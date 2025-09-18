@@ -1305,7 +1305,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Check if we have a claimed nickname for this peer
         let peerNicknames = meshService.getPeerNicknames()
-        if let nickname = peerNicknames[peerID], nickname != "Unknown" && nickname != "anon\(peerID.prefix(4))" {
+        if let nickname = peerNicknames[Peer(str: peerID)], nickname != "Unknown" && nickname != "anon\(peerID.prefix(4))" {
             // Update or create social identity with the claimed nickname
             if var identity = identityManager.getSocialIdentity(for: fingerprintStr) {
                 identity.claimedNickname = nickname
@@ -2976,7 +2976,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 for (currentPeerID, currentNickname) in meshService.getPeerNicknames() {
                     if currentNickname == peerNickname {
                         SecureLogger.info("📖 Resolved updated peer ID for read receipt: \(peerID) -> \(currentPeerID)", category: .session)
-                        actualPeerID = currentPeerID
+                        actualPeerID = currentPeerID.id
                         break
                     }
                 }
@@ -4257,7 +4257,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // First try direct peer nicknames from mesh service
         let peerNicknames = meshService.getPeerNicknames()
-        if let nickname = peerNicknames[peerID] {
+        if let nickname = peerNicknames[Peer(str: peerID)] {
             return nickname
         }
         

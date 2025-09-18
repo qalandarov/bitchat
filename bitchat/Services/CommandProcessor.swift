@@ -182,8 +182,8 @@ final class CommandProcessor {
             let meshBlocked = chatViewModel?.blockedUsers ?? []
             var blockedNicknames: [String] = []
             if let peers = meshService?.getPeerNicknames() {
-                for (peerID, nickname) in peers {
-                    if let fingerprint = meshService?.getFingerprint(for: Peer(str: peerID)),
+                for (peer, nickname) in peers {
+                    if let fingerprint = meshService?.getFingerprint(for: peer),
                        meshBlocked.contains(fingerprint) {
                         blockedNicknames.append(nickname)
                     }
