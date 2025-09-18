@@ -4502,7 +4502,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         }
                     }
                 }
-                meshService.sendVerifyResponse(to: peerID, noiseKeyHex: tlv.noiseKeyHex, nonceA: tlv.nonceA)
+                meshService.sendVerifyResponse(to: Peer(str: peerID), noiseKeyHex: tlv.noiseKeyHex, nonceA: tlv.nonceA)
                 // Silent response: no toast needed on responder
             case .verifyResponse:
                 guard let resp = VerificationService.shared.parseVerifyResponse(payload) else { return }

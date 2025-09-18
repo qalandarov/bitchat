@@ -49,7 +49,7 @@ protocol Transport: AnyObject {
 
     // QR verification (optional for transports)
     func sendVerifyChallenge(to peer: Peer, noiseKeyHex: String, nonceA: Data)
-    func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data)
+    func sendVerifyResponse(to peer: Peer, noiseKeyHex: String, nonceA: Data)
 
     // Peer snapshots (for non-UI services)
     var peerSnapshotPublisher: AnyPublisher<[TransportPeerSnapshot], Never> { get }
@@ -58,7 +58,7 @@ protocol Transport: AnyObject {
 
 extension Transport {
     func sendVerifyChallenge(to peer: Peer, noiseKeyHex: String, nonceA: Data) {}
-    func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data) {}
+    func sendVerifyResponse(to peer: Peer, noiseKeyHex: String, nonceA: Data) {}
 }
 
 protocol TransportPeerEventsDelegate: AnyObject {

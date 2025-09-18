@@ -658,9 +658,9 @@ final class BLEService: NSObject {
         sendNoisePayload(payload, to: peer.id)
     }
 
-    func sendVerifyResponse(to peerID: String, noiseKeyHex: String, nonceA: Data) {
+    func sendVerifyResponse(to peer: Peer, noiseKeyHex: String, nonceA: Data) {
         guard let payload = VerificationService.shared.buildVerifyResponse(noiseKeyHex: noiseKeyHex, nonceA: nonceA) else { return }
-        sendNoisePayload(payload, to: peerID)
+        sendNoisePayload(payload, to: peer.id)
     }
 
     private func sendNoisePayload(_ typedPayload: Data, to peerID: String) {
