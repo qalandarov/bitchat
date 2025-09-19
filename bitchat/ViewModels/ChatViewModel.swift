@@ -286,7 +286,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             .map { ($0, privateChats[$0]?.last?.timestamp ?? Date.distantPast) }
             .sorted { $0.1 > $1.1 }
         if let target = unreadSorted.first?.0 {
-            startPrivateChat(with: target)
+            startPrivateChat(with: Peer(str: target))
             return
         }
         // Otherwise pick most recent private chat overall
@@ -294,7 +294,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             .map { (id: $0.key, ts: $0.value.last?.timestamp ?? Date.distantPast) }
             .sorted { $0.ts > $1.ts }
         if let target = recent.first?.id {
-            startPrivateChat(with: target)
+            startPrivateChat(with: Peer(str: target))
         }
     }
     
@@ -2386,50 +2386,50 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Private Chat Management
     
     /// Initiates a private chat session with a peer.
-    /// - Parameter peerID: The peer's ID to start chatting with
+    /// - Parameter peer: The peer to start chatting with
     /// - Note: Switches the UI to private chat mode and loads message history
     @MainActor
-    func startPrivateChat(with peerID: String) {
+    func startPrivateChat(with peer: Peer) {
         // Safety check: Don't allow starting chat with ourselves
-        if peerID == meshService.myPeer.id {
+        if peer == meshService.myPeer {
             return
         }
         
-        let peerNickname = meshService.peerNickname(peer: Peer(str: peerID)) ?? "unknown"
+        let peerNickname = meshService.peerNickname(peer: peer) ?? "unknown"
         
         // Check if the peer is blocked
-        if unifiedPeerService.isBlocked(Peer(str: peerID)) {
+        if unifiedPeerService.isBlocked(peer) {
             addSystemMessage("cannot start chat with \(peerNickname): user is blocked.")
             return
         }
         
         // Check mutual favorites for offline messaging
-        if let peer = unifiedPeerService.getPeer(by: peerID),
-           peer.isFavorite && !peer.theyFavoritedUs && !peer.isConnected {
+        if let bitchatPeer = unifiedPeerService.getPeer(by: peer.id),
+           bitchatPeer.isFavorite && !bitchatPeer.theyFavoritedUs && !bitchatPeer.isConnected {
             addSystemMessage("cannot start chat with \(peerNickname): mutual favorite required for offline messaging.")
             return
         }
         
         // Consolidate messages from stable Noise key if needed
         // This ensures Nostr messages appear when opening a chat with an ephemeral peer ID
-        if let peer = unifiedPeerService.getPeer(by: peerID) {
-            let noiseKeyHex = peer.noisePublicKey.hexEncodedString()
+        if let bitchatPeer = unifiedPeerService.getPeer(by: peer.id) {
+            let noiseKeyHex = bitchatPeer.noisePublicKey.hexEncodedString()
             
             // If we have messages stored under the stable Noise key hex but not under the ephemeral ID,
             // or if we need to merge them, do so now
-            if noiseKeyHex != peerID {
+            if noiseKeyHex != peer.id {
                 if let nostrMessages = privateChats[noiseKeyHex], !nostrMessages.isEmpty {
                     // Check if there are ACTUALLY unread messages (not just the unread flag)
                     // Only transfer unread status if there are recent unread messages
                     var hasActualUnreadMessages = false
                     
                     // Merge messages from stable key into ephemeral peer ID storage
-                    if privateChats[peerID] == nil {
-                        privateChats[peerID] = []
+                    if privateChats[peer.id] == nil {
+                        privateChats[peer.id] = []
                     }
                     
                     // Add any messages that aren't already in the ephemeral storage
-                    let existingMessageIds = Set(privateChats[peerID]?.map { $0.id } ?? [])
+                    let existingMessageIds = Set(privateChats[peer.id]?.map { $0.id } ?? [])
                     for message in nostrMessages {
                         if !existingMessageIds.contains(message.id) {
                             // Create updated message with correct senderPeerID
@@ -2443,11 +2443,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 originalSender: message.originalSender,
                                 isPrivate: message.isPrivate,
                                 recipientNickname: message.recipientNickname,
-                                senderPeer: message.senderPeer == meshService.myPeer ? meshService.myPeer : Peer(str: peerID),  // Update peer ID if it's from them
+                                senderPeer: message.senderPeer == meshService.myPeer ? meshService.myPeer : peer,  // Update peer ID if it's from them
                                 mentions: message.mentions,
                                 deliveryStatus: message.deliveryStatus
                             )
-                            privateChats[peerID]?.append(updatedMessage)
+                            privateChats[peer.id]?.append(updatedMessage)
                             
                             // Check if this is an actually unread message
                             // Only mark as unread if:
@@ -2464,11 +2464,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                     
                     // Sort by timestamp
-                    privateChats[peerID]?.sort { $0.timestamp < $1.timestamp }
+                    privateChats[peer.id]?.sort { $0.timestamp < $1.timestamp }
                     
                     // Only transfer unread status if there are actual recent unread messages
                     if hasActualUnreadMessages {
-                        unreadPrivateMessages.insert(peerID)
+                        unreadPrivateMessages.insert(peer.id)
                     } else if unreadPrivateMessages.contains(noiseKeyHex) {
                         // Remove incorrect unread status from stable key
                         unreadPrivateMessages.remove(noiseKeyHex)
@@ -2490,7 +2490,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Find all temporary Nostr peer IDs that have messages from the same nickname
         for (storedPeerID, messages) in privateChats {
-            if storedPeerID.hasPrefix("nostr_") && storedPeerID != peerID {
+            if storedPeerID.hasPrefix("nostr_") && storedPeerID != peer.id {
                 // Check if ALL messages from this temporary peer have the same sender nickname
                 // This is more reliable than just checking the first message
                 let nicknamesMatch = messages.allSatisfy { msg in
@@ -2504,11 +2504,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Consolidate messages from temporary Nostr peer IDs
         if !tempPeerIDsToConsolidate.isEmpty {
-            if privateChats[peerID] == nil {
-                privateChats[peerID] = []
+            if privateChats[peer.id] == nil {
+                privateChats[peer.id] = []
             }
             
-            let existingMessageIds = Set(privateChats[peerID]?.map { $0.id } ?? [])
+            let existingMessageIds = Set(privateChats[peer.id]?.map { $0.id } ?? [])
             var consolidatedCount = 0
             
             var hadUnreadTemp = false
@@ -2531,11 +2531,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 originalSender: message.originalSender,
                                 isPrivate: message.isPrivate,
                                 recipientNickname: message.recipientNickname,
-                                senderPeer: Peer(str: peerID),  // Update to match current peer
+                                senderPeer: peer,  // Update to match current peer
                                 mentions: message.mentions,
                                 deliveryStatus: message.deliveryStatus
                             )
-                            privateChats[peerID]?.append(updatedMessage)
+                            privateChats[peer.id]?.append(updatedMessage)
                             consolidatedCount += 1
                         }
                     }
@@ -2547,35 +2547,35 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             // If any temp peer ID had unread messages, mark the consolidated peer as unread
             if hadUnreadTemp {
-                unreadPrivateMessages.insert(peerID)
-                SecureLogger.debug("📬 Transferred unread status from temp peer IDs to \(peerID)", category: .session)
+                unreadPrivateMessages.insert(peer.id)
+                SecureLogger.debug("📬 Transferred unread status from temp peer IDs to \(peer.id)", category: .session)
             }
             
             if consolidatedCount > 0 {
                 // Sort by timestamp
-                privateChats[peerID]?.sort { $0.timestamp < $1.timestamp }
+                privateChats[peer.id]?.sort { $0.timestamp < $1.timestamp }
                 
                 SecureLogger.info("📥 Consolidated \(consolidatedCount) Nostr messages from temporary peer IDs to \(peerNickname)", category: .session)
             }
         }
         
         // Trigger handshake if needed (mesh peers only). Skip for Nostr geohash conv keys.
-        if !peerID.hasPrefix("nostr_") && !peerID.hasPrefix("nostr:") {
-            let sessionState = meshService.getNoiseSessionState(for: Peer(str: peerID))
+        if !peer.isNostrUnderscore && !peer.isNostrColon {
+            let sessionState = meshService.getNoiseSessionState(for: peer)
             switch sessionState {
             case .none, .failed:
-                meshService.triggerHandshake(with: Peer(str: peerID))
+                meshService.triggerHandshake(with: peer)
             default:
                 break
             }
         } else {
-            SecureLogger.debug("GeoDM: skipping mesh handshake for virtual peerID=\(peerID)", category: .session)
+            SecureLogger.debug("GeoDM: skipping mesh handshake for virtual peerID=\(peer.id)", category: .session)
         }
         
         // Delegate to private chat manager but add already-acked messages first
         // This prevents duplicate read receipts
         // IMPORTANT: Only add messages WE sent to sentReadReceipts, not messages we received
-        if let messages = privateChats[peerID] {
+        if let messages = privateChats[peer.id] {
             for message in messages {
                 // Only track read receipts for messages WE sent (not received messages)
                 if message.sender == nickname {
@@ -2593,11 +2593,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
         }
         
-        privateChatManager.startChat(with: Peer(str: peerID))
+        privateChatManager.startChat(with: peer)
         
         // Also mark messages as read for Nostr ACKs
         // This ensures read receipts are sent even for consolidated messages
-        markPrivateMessagesAsRead(from: peerID)
+        markPrivateMessagesAsRead(from: peer.id)
     }
     
     func endPrivateChat() {

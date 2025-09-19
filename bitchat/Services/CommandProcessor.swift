@@ -88,7 +88,7 @@ final class CommandProcessor {
             return .error(message: "'\(nickname)' not found")
         }
         
-        chatViewModel?.startPrivateChat(with: peerID)
+        chatViewModel?.startPrivateChat(with: Peer(str: peerID))
         
         if parts.count > 1 {
             let message = String(parts[1])
@@ -151,9 +151,9 @@ final class CommandProcessor {
             // In private chat
             if let peerNickname = meshService?.peerNickname(peer: targetPeer) {
                 let personalMessage = "* \(emoji) \(myNickname) \(action) you\(suffix) *"
-                meshService?.sendPrivateMessage(personalMessage, to: targetPeer, 
-                                               recipientNickname: peerNickname, 
-                                               messageID: UUID().uuidString)
+                meshService?.sendPrivateMessage(personalMessage, to: targetPeer,
+                                                recipientNickname: peerNickname,
+                                                messageID: UUID().uuidString)
                 // Also add a local system message so the sender sees a natural-language confirmation
                 let pastAction: String = {
                     switch action {

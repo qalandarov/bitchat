@@ -201,7 +201,7 @@ struct ContentView: View {
                             viewModel.startGeohashDM(withPubkeyHex: full)
                         }
                     } else {
-                        viewModel.startPrivateChat(with: peerID)
+                        viewModel.startPrivateChat(with: Peer(str: peerID))
                     }
                     withAnimation(.easeInOut(duration: TransportConfig.uiAnimationMediumSeconds)) {
                         showSidebar = false
@@ -957,7 +957,7 @@ struct ContentView: View {
                                  textColor: textColor,
                                  secondaryTextColor: secondaryTextColor,
                                  onTapPeer: { peerID in
-                                     viewModel.startPrivateChat(with: peerID)
+                                     viewModel.startPrivateChat(with: Peer(str: peerID))
                                      withAnimation(.easeInOut(duration: TransportConfig.uiAnimationMediumSeconds)) {
                                          showSidebar = false
                                          sidebarDragOffset = 0
