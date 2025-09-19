@@ -2178,7 +2178,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Geohash DM routing: conversation keys start with "nostr_"
         if peer.isNostrUnderscore {
-            sendGeohashDM(content, to: peer.id)
+            sendGeohashDM(content, to: peer)
         }
         
         // Determine routing method and recipient nickname
@@ -2240,7 +2240,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
     }
     
-    private func sendGeohashDM(_ content: String, to peerID: String) {
+    private func sendGeohashDM(_ content: String, to peer: Peer) {
         guard case .location(let ch) = activeChannel else {
             addSystemMessage("cannot send: not in a location channel")
             return
@@ -2260,26 +2260,26 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             deliveryStatus: .sending
         )
         
-        if privateChats[peerID] == nil {
-            privateChats[peerID] = []
+        if privateChats[peer.id] == nil {
+            privateChats[peer.id] = []
         }
         
-        privateChats[peerID]?.append(message)
-        trimPrivateChatMessagesIfNeeded(for: peerID)
+        privateChats[peer.id]?.append(message)
+        trimPrivateChatMessagesIfNeeded(for: peer.id)
         objectWillChange.send()
 
         // Resolve recipient hex from mapping
-        guard let recipientHex = nostrKeyMapping[peerID] else {
-            if let msgIdx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[msgIdx].deliveryStatus = .failed(reason: "unknown recipient")
+        guard let recipientHex = nostrKeyMapping[peer.id] else {
+            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[msgIdx].deliveryStatus = .failed(reason: "unknown recipient")
             }
             return
         }
         
         // Respect geohash blocks
         if identityManager.isNostrBlocked(pubkeyHexLowercased: recipientHex) {
-            if let msgIdx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[msgIdx].deliveryStatus = .failed(reason: "user is blocked")
+            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[msgIdx].deliveryStatus = .failed(reason: "user is blocked")
             }
             addSystemMessage("cannot send message: user is blocked.")
             return
@@ -2290,21 +2290,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let id = try NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash)
             // Prevent messaging ourselves
             if recipientHex.lowercased() == id.publicKeyHex.lowercased() {
-                if let idx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                    privateChats[peerID]?[idx].deliveryStatus = .failed(reason: "cannot message yourself")
+                if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[peer.id]?[idx].deliveryStatus = .failed(reason: "cannot message yourself")
                 }
                 return
             }
-            SecureLogger.debug("GeoDM: local send mid=\(messageID.prefix(8))… to=\(recipientHex.prefix(8))… conv=\(peerID)", category: .session)
+            SecureLogger.debug("GeoDM: local send mid=\(messageID.prefix(8))… to=\(recipientHex.prefix(8))… conv=\(peer)", category: .session)
             let nostrTransport = NostrTransport(keychain: keychain)
             nostrTransport.senderPeerID = meshService.myPeer.id
             nostrTransport.sendPrivateMessageGeohash(content: content, toRecipientHex: recipientHex, from: id, messageID: messageID)
-            if let msgIdx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[msgIdx].deliveryStatus = .sent
+            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[msgIdx].deliveryStatus = .sent
             }
         } catch {
-            if let idx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[idx].deliveryStatus = .failed(reason: "send error")
+            if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[idx].deliveryStatus = .failed(reason: "send error")
             }
         }
     }
