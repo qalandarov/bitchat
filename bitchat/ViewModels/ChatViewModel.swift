@@ -5084,7 +5084,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Favorite/unfavorite notifications embedded as private messages
         if messageContent.hasPrefix("[FAVORITED]") || messageContent.hasPrefix("[UNFAVORITED]") {
             if let key = actualSenderNoiseKey {
-                handleFavoriteNotificationFromMesh(messageContent, from: key.hexEncodedString(), senderNickname: senderNickname)
+                handleFavoriteNotificationFromMesh(messageContent, from: Peer(str: key.hexEncodedString()), senderNickname: senderNickname)
             }
             return
         }
@@ -5343,7 +5343,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     //
     
     @MainActor
-    private func handleFavoriteNotificationFromMesh(_ content: String, from peerID: String, senderNickname: String) {
+    private func handleFavoriteNotificationFromMesh(_ content: String, from peer: Peer, senderNickname: String) {
         // Parse the message format: "[FAVORITED]:npub..." or "[UNFAVORITED]:npub..."
         let isFavorite = content.hasPrefix("[FAVORITED]")
         let parts = content.split(separator: ":")
@@ -5357,28 +5357,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Get the noise public key for this peer
         // Try both ephemeral ID and if that fails, get from peer service
-        var noiseKey: Data? = nil
-        
         // First try as hex-encoded Noise key (64 chars)
-        if peerID.count == 64 {
-            noiseKey = Data(hexString: peerID)
-        }
-        
         // If not a hex key, get from peer service (ephemeral ID)
-        if noiseKey == nil, let peer = unifiedPeerService.getBitchatPeer(for: Peer(str: peerID)) {
-            noiseKey = peer.noisePublicKey
-        }
-        
-        guard let finalNoiseKey = noiseKey else {
-            SecureLogger.warning("⚠️ Cannot get Noise key for peer \(peerID)", category: .session)
+        guard let noiseKey = peer.noiseKey ?? unifiedPeerService.getBitchatPeer(for: peer)?.noisePublicKey else {
+            SecureLogger.warning("⚠️ Cannot get Noise key for peer \(peer.id)", category: .session)
             return
         }
         // Determine prior state to avoid duplicate system messages on repeated notifications
-        let prior = FavoritesPersistenceService.shared.getFavoriteStatus(for: finalNoiseKey)?.theyFavoritedUs ?? false
+        let prior = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey)?.theyFavoritedUs ?? false
 
         // Update the favorite relationship (idempotent storage)
         FavoritesPersistenceService.shared.updatePeerFavoritedUs(
-            peerNoisePublicKey: finalNoiseKey,
+            peerNoisePublicKey: noiseKey,
             favorited: isFavorite,
             peerNickname: senderNickname,
             peerNostrPublicKey: nostrPubkey
@@ -5743,7 +5733,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Check if this is a favorite/unfavorite notification
         if message.content.hasPrefix("[FAVORITED]") || message.content.hasPrefix("[UNFAVORITED]") {
-            handleFavoriteNotificationFromMesh(message.content, from: peerID, senderNickname: message.sender)
+            handleFavoriteNotificationFromMesh(message.content, from: Peer(str: peerID), senderNickname: message.sender)
             return  // Don't store as a regular message
         }
         
