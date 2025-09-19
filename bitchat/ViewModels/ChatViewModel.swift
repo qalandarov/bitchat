@@ -5616,10 +5616,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     /// Migrate private chats when peer reconnects with new ID
     @MainActor
-    private func migratePrivateChatsIfNeeded(for peerID: String, senderNickname: String) {
-        let currentFingerprint = getFingerprint(for: Peer(str: peerID))
+    private func migratePrivateChatsIfNeeded(for peer: Peer, senderNickname: String) {
+        let currentFingerprint = getFingerprint(for: peer)
         
-        if privateChats[peerID] == nil || privateChats[peerID]?.isEmpty == true {
+        if privateChats[peer.id] == nil || privateChats[peer.id]?.isEmpty == true {
             var migratedMessages: [BitchatMessage] = []
             var oldPeerIDsToRemove: [String] = []
             
@@ -5627,7 +5627,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let cutoffTime = Date().addingTimeInterval(-TransportConfig.uiMigrationCutoffSeconds)
             
             for (oldPeerID, messages) in privateChats {
-                if oldPeerID != peerID {
+                if oldPeerID != peer.id {
                     let oldFingerprint = peerIDToPublicKeyFingerprint[oldPeerID]
                     
                     // Filter messages to only recent ones
@@ -5650,7 +5650,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                             SecureLogger.info("📦 Partially migrating \(recentMessages.count) of \(messages.count) messages from \(oldPeerID)", category: .session)
                         }
                         
-                        SecureLogger.info("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peerID) (fingerprint match)", category: .session)
+                        SecureLogger.info("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peer) (fingerprint match)", category: .session)
                     } else if currentFingerprint == nil || oldFingerprint == nil {
                         // Check if this chat contains messages with this sender by nickname
                         let isRelevantChat = recentMessages.contains { msg in
@@ -5666,7 +5666,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 oldPeerIDsToRemove.append(oldPeerID)
                             }
                             
-                            SecureLogger.warning("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peerID) (nickname match)", category: .session)
+                            SecureLogger.warning("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peer.id) (nickname match)", category: .session)
                         }
                     }
                 }
@@ -5684,7 +5684,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
                 
                 // Add or update messages for the new peer ID
-                if var existingMessages = privateChats[peerID] {
+                if var existingMessages = privateChats[peer.id] {
                     // Merge with existing messages, replace-by-id semantics
                     for msg in migratedMessages {
                         if let i = existingMessages.firstIndex(where: { $0.id == msg.id }) {
@@ -5694,17 +5694,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         }
                     }
                     existingMessages.sort { $0.timestamp < $1.timestamp }
-                    privateChats[peerID] = existingMessages
+                    privateChats[peer.id] = existingMessages
                 } else {
                     // Initialize with migrated messages
-                    privateChats[peerID] = migratedMessages
+                    privateChats[peer.id] = migratedMessages
                 }
-                privateChatManager.sanitizeChat(for: Peer(str: peerID))
+                privateChatManager.sanitizeChat(for: peer)
                 
                 // Update selectedPrivateChatPeer if it was pointing to an old ID
                 if needsSelectedUpdate {
-                    selectedPrivateChatPeer = peerID
-                    SecureLogger.info("📱 Updated selectedPrivateChatPeer from old ID to \(peerID) during migration", category: .session)
+                    selectedPrivateChatPeer = peer.id
+                    SecureLogger.info("📱 Updated selectedPrivateChatPeer from old ID to \(peer.id) during migration", category: .session)
                 }
             }
         }
@@ -5728,7 +5728,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Migrate chats if needed
-        migratePrivateChatsIfNeeded(for: peerID, senderNickname: message.sender)
+        migratePrivateChatsIfNeeded(for: Peer(str: peerID), senderNickname: message.sender)
         
         // IMPORTANT: Also consolidate messages from stable Noise key if this is an ephemeral peer
         // This ensures Nostr messages appear in BLE chats
