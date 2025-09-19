@@ -1354,7 +1354,7 @@ struct ContentView: View {
         }()
         
         // Resolve peer object for header context (may be offline favorite)
-        let peer = viewModel.getPeer(byID: headerPeerID)
+        let peer = viewModel.getBitchatPeer(for: Peer(str: headerPeerID))
         let privatePeerNick: String = {
             if privatePeerID.hasPrefix("nostr_") {
                 // Build geohash DM header: "#<ghash>/@name#abcd"

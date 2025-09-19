@@ -48,7 +48,7 @@ struct FingerprintView: View {
                 }()
                 // Resolve a friendly name
                 let peerNickname: String = {
-                    if let p = viewModel.getPeer(byID: statusPeerID) { return p.displayName }
+                    if let p = viewModel.getBitchatPeer(for: Peer(str: statusPeerID)) { return p.displayName }
                     if let name = viewModel.meshService.peerNickname(peer: Peer(str: statusPeerID)) { return name }
                     if peerID.count == 64, let data = Data(hexString: peerID) {
                         if let fav = FavoritesPersistenceService.shared.getFavoriteStatus(for: data), !fav.peerNickname.isEmpty { return fav.peerNickname }

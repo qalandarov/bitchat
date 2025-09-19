@@ -225,8 +225,8 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     // MARK: - Public Methods
     
     /// Get peer by ID
-    func getPeer(by id: String) -> BitchatPeer? {
-        return peerIndex[id]
+    func getBitchatPeer(for peer: Peer) -> BitchatPeer? {
+        return peerIndex[peer.id]
     }
     
     /// Get peer ID for nickname
@@ -259,7 +259,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Toggle favorite status
     func toggleFavorite(_ peer: Peer) {
-        guard let bitchatPeer = getPeer(by: peer.id) else {
+        guard let bitchatPeer = getBitchatPeer(for: peer) else {
             SecureLogger.warning("⚠️ Cannot toggle favorite - peer not found: \(peer.id)", category: .session)
             return
         }
@@ -331,7 +331,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             ?? SocialIdentity(
                 fingerprint: fingerprint,
                 localPetname: nil,
-                claimedNickname: getPeer(by: peer.id)?.displayName ?? "Unknown",
+                claimedNickname: getBitchatPeer(for: peer)?.displayName ?? "Unknown",
                 trustLevel: .unknown,
                 isFavorite: false,
                 isBlocked: false,
@@ -345,8 +345,8 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         if identity.isBlocked {
             identity.isFavorite = false
             // Also remove from favorites service
-            if let peer = getPeer(by: peer.id) {
-                favoritesService.removeFavorite(peerNoisePublicKey: peer.noisePublicKey)
+            if let bitchatPeer = getBitchatPeer(for: peer) {
+                favoritesService.removeFavorite(peerNoisePublicKey: bitchatPeer.noisePublicKey)
             }
         }
         
@@ -367,9 +367,9 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         }
         
         // Try to get from peer's public key
-        if let peer = getPeer(by: peer.id) {
-            let fingerprint = peer.noisePublicKey.sha256Fingerprint()
-            fingerprintCache[peer.id] = fingerprint
+        if let bitchatPeer = getBitchatPeer(for: peer) {
+            let fingerprint = bitchatPeer.noisePublicKey.sha256Fingerprint()
+            fingerprintCache[bitchatPeer.id] = fingerprint
             return fingerprint
         }
         
