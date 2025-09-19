@@ -3045,7 +3045,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func getPeerIDForNickname(_ nickname: String) -> String? {
+    func getPeer(for nickname: String) -> Peer? {
         // When in a geohash channel, allow resolving by geohash participant nickname
         switch LocationChannelManager.shared.selectedChannel {
         case .location:
@@ -3054,7 +3054,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 if let person = visibleGeohashPeople().first(where: { $0.displayName == nickname }) {
                     let convKey = "nostr_" + String(person.id.prefix(TransportConfig.nostrConvKeyPrefixLength))
                     nostrKeyMapping[convKey] = person.id
-                    return convKey
+                    return Peer(str: convKey)
                 }
             }
             let base: String = {
@@ -3065,13 +3065,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             if let pub = geoNicknames.first(where: { (_, nick) in nick.lowercased() == base })?.key {
                 let convKey = "nostr_" + String(pub.prefix(TransportConfig.nostrConvKeyPrefixLength))
                 nostrKeyMapping[convKey] = pub
-                return convKey
+                return Peer(str: convKey)
             }
         default:
             break
         }
         // Fallback to mesh nickname resolution
-        return unifiedPeerService.getPeerID(for: nickname)
+        return unifiedPeerService.getPeer(for: nickname)
     }
     
     
@@ -5564,8 +5564,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Check if a message should be blocked based on sender
     @MainActor
     private func isMessageBlocked(_ message: BitchatMessage) -> Bool {
-        guard let peerID = message.senderPeer?.id ?? getPeerIDForNickname(message.sender) else { return false }
-        let peer = Peer(str: peerID)
+        guard let peer = message.senderPeer ?? getPeer(for: message.sender) else { return false }
         
         // Check mesh/known peers first
         if isPeerBlocked(peer) {
@@ -5716,9 +5715,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func handlePrivateMessage(_ message: BitchatMessage) {
         SecureLogger.debug("📥 handlePrivateMessage called for message from \(message.sender)", category: .session)
-        let senderPeerID = message.senderPeer?.id ?? getPeerIDForNickname(message.sender)
+        let senderPeer = message.senderPeer ?? getPeer(for: message.sender)
         
-        guard let peerID = senderPeerID else { 
+        guard let peerID = senderPeer?.id else { 
             SecureLogger.warning("⚠️ Could not get peer ID for sender \(message.sender)", category: .session)
             return 
         }

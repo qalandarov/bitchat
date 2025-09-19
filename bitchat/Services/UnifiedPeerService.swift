@@ -230,11 +230,9 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     }
     
     /// Get peer ID for nickname
-    func getPeerID(for nickname: String) -> String? {
-        for peer in peers {
-            if peer.displayName == nickname || peer.nickname == nickname {
-                return peer.id
-            }
+    func getPeer(for nickname: String) -> Peer? {
+        for bitchatPeer in peers where bitchatPeer.displayName == nickname || bitchatPeer.nickname == nickname {
+            return Peer(str: bitchatPeer.id)
         }
         return nil
     }
