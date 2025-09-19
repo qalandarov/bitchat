@@ -972,7 +972,7 @@ struct ContentView: View {
                 }
                     }
                 }
-                .id(viewModel.allPeers.map { "\($0.id)-\($0.isConnected)" }.joined())
+                .id(viewModel.allBitchatPeers.map { "\($0.id)-\($0.isConnected)" }.joined())
             }
             
             Spacer()
@@ -1067,7 +1067,7 @@ struct ContentView: View {
             let standardGreen = (colorScheme == .dark) ? Color.green : Color(red: 0, green: 0.5, blue: 0)
             return (n, n > 0 ? standardGreen : Color.secondary)
         case .mesh:
-            let counts = viewModel.allPeers.reduce(into: (others: 0, mesh: 0)) { counts, peer in
+            let counts = viewModel.allBitchatPeers.reduce(into: (others: 0, mesh: 0)) { counts, peer in
                 guard peer.id != viewModel.meshService.myPeer.id else { return }
                 if peer.isConnected { counts.mesh += 1; counts.others += 1 }
                 else if peer.isReachable { counts.others += 1 }
@@ -1389,7 +1389,7 @@ struct ContentView: View {
         }()
         let isNostrAvailable: Bool = {
             guard let connectionState = peer?.connectionState else { 
-                // Check if we can reach this peer via Nostr even if not in allPeers
+                // Check if we can reach this peer via Nostr even if not in allBitchatPeers
                 if let noiseKey = Data(hexString: headerPeerID),
                    let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey),
                    favoriteStatus.isMutual {

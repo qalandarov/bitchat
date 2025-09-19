@@ -247,7 +247,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // Computed properties for compatibility
     @MainActor
     var connectedPeers: [String] { Array(unifiedPeerService.connectedPeerIDs) }
-    @Published var allPeers: [BitchatPeer] = []
+    @Published var allBitchatPeers: [BitchatPeer] = []
     var privateChats: [String: [BitchatMessage]] { 
         get { privateChatManager.privateChats }
         set { privateChatManager.privateChats = newValue }
@@ -316,7 +316,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     func getShortIDForNoiseKey(_ fullNoiseKeyHex: String) -> String? {
         // Check known peers for a noise key match
-        if let match = allPeers.first(where: { $0.noisePublicKey.hexEncodedString() == fullNoiseKeyHex }) {
+        if let match = allBitchatPeers.first(where: { $0.noisePublicKey.hexEncodedString() == fullNoiseKeyHex }) {
             return match.id
         }
         // Also search cache mapping
@@ -565,14 +565,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             self.isStartupPhase = false
         }
         // Bind unified peer service's peer list to our published property
-        let peersCancellable = unifiedPeerService.$peers
+        let peersCancellable = unifiedPeerService.$bitchatPeers
             .receive(on: DispatchQueue.main)
             .sink { [weak self] peers in
                 guard let self = self else { return }
-                // Update peers directly; @Published drives UI updates
-                self.allPeers = peers
+                // Update bitchatPeers directly; @Published drives UI updates
+                self.allBitchatPeers = peers
                 // Update peer index for O(1) lookups
-                // Deduplicate peers by ID to prevent crash from duplicate keys
+                // Deduplicate bitchatPeers by ID to prevent crash from duplicate keys
                 var uniquePeers: [String: BitchatPeer] = [:]
                 for peer in peers {
                     // Keep the first occurrence of each peer ID
@@ -1203,7 +1203,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // This is a stable Noise key hex (used in private chats)
         // Find the ephemeral peer ID for this Noise key
-        let ephemeralPeerID = unifiedPeerService.peers.first { $0.noisePublicKey == noisePublicKey }?.id
+        let ephemeralPeerID = unifiedPeerService.bitchatPeers.first { $0.noisePublicKey == noisePublicKey }?.id
         
         if let ephemeralID = ephemeralPeerID {
             // Found the ephemeral peer, use normal toggle
@@ -3854,7 +3854,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Build current peer->seed map (excluding self)
         let myID = meshService.myPeer.id
         var currentSeeds: [String: String] = [:]
-        for p in allPeers where p.id != myID {
+        for p in allBitchatPeers where p.id != myID {
             currentSeeds[p.id] = meshSeed(for: Peer(str: p.id))
         }
         // If seeds unchanged and palette exists for both themes, skip
@@ -4489,7 +4489,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     func beginQRVerification(with qr: VerificationService.VerificationQR) -> Bool {
         // Find a matching peer by Noise key
         let targetNoise = qr.noiseKeyHex.lowercased()
-        guard let peer = unifiedPeerService.peers.first(where: { $0.noisePublicKey.hexEncodedString().lowercased() == targetNoise }) else {
+        guard let peer = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey.hexEncodedString().lowercased() == targetNoise }) else {
             return false
         }
         let peerID = peer.id
@@ -4683,7 +4683,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Clean up stale unread peer IDs that no longer exist in the peer list
     @MainActor
     private func cleanupStaleUnreadPeerIDs() {
-        let currentPeerIDs = Set(unifiedPeerService.peers.map { $0.id })
+        let currentPeerIDs = Set(unifiedPeerService.bitchatPeers.map { $0.id })
         let staleIDs = unreadPrivateMessages.subtracting(currentPeerIDs)
         
         if !staleIDs.isEmpty {
@@ -5173,7 +5173,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func mirrorToEphemeralIfNeeded(_ message: BitchatMessage, targetPeer: Peer, key: Data?) {
         guard let key,
-              let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id,
+              let ephemeralPeerID = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey == key })?.id,
               ephemeralPeerID != targetPeer.id
         else {
             return
@@ -5210,7 +5210,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func handleViewingThisChat(_ message: BitchatMessage, targetPeer: Peer, key: Data?, senderPubkey: String) {
         unreadPrivateMessages.remove(targetPeer.id)
         if let key,
-           let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id {
+           let ephemeralPeerID = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey == key })?.id {
             unreadPrivateMessages.remove(ephemeralPeerID)
         }
         if !sentReadReceipts.contains(message.id) {
@@ -5242,7 +5242,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         unreadPrivateMessages.insert(targetPeer.id)
         if let key,
-           let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id,
+           let ephemeralPeerID = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey == key })?.id,
            ephemeralPeerID != targetPeer.id {
             unreadPrivateMessages.insert(ephemeralPeerID)
         }

@@ -18,7 +18,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     // MARK: - Published Properties
     
-    @Published private(set) var peers: [BitchatPeer] = []
+    @Published private(set) var bitchatPeers: [BitchatPeer] = []
     @Published private(set) var connectedPeerIDs: Set<String> = []
     @Published private(set) var favorites: [BitchatPeer] = []
     @Published private(set) var mutualFavorites: [BitchatPeer] = []
@@ -155,7 +155,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let filtered = enrichedPeers.filter { p in
             p.isConnected || p.isReachable || p.isMutualFavorite
         }
-        self.peers = filtered
+        self.bitchatPeers = filtered
         self.connectedPeerIDs = connected
         self.favorites = favoritesList
         self.mutualFavorites = mutualsList
@@ -231,7 +231,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Get peer ID for nickname
     func getPeer(for nickname: String) -> Peer? {
-        for bitchatPeer in peers where bitchatPeer.displayName == nickname || bitchatPeer.nickname == nickname {
+        for bitchatPeer in bitchatPeers where bitchatPeer.displayName == nickname || bitchatPeer.nickname == nickname {
             return Peer(str: bitchatPeer.id)
         }
         return nil
@@ -376,13 +376,12 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     // MARK: - Compatibility Methods (for easy migration)
     
-    var allPeers: [BitchatPeer] { peers }
     var connectedPeers: [String] { Array(connectedPeerIDs) }
     var favoritePeers: Set<String> { 
         Set(favorites.compactMap { getFingerprint(for: Peer(str: $0.id)) })
     }
     var blockedUsers: Set<String> {
-        Set(peers.compactMap { batchPeer in
+        Set(bitchatPeers.compactMap { batchPeer in
             isBlocked(Peer(str: batchPeer.id)) ? getFingerprint(for: Peer(str: batchPeer.id)) : nil
         })
     }

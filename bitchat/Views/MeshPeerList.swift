@@ -12,7 +12,7 @@ struct MeshPeerList: View {
     @State private var orderedIDs: [String] = []
 
     var body: some View {
-        if viewModel.allPeers.isEmpty {
+        if viewModel.allBitchatPeers.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 Text("nobody around...")
                     .font(.system(size: 14, design: .monospaced))
@@ -22,7 +22,7 @@ struct MeshPeerList: View {
             }
         } else {
             let myPeerID = viewModel.meshService.myPeer.id
-            let mapped: [(peer: BitchatPeer, isMe: Bool, hasUnread: Bool, enc: EncryptionStatus)] = viewModel.allPeers.map { bitchatPeer in
+            let mapped: [(peer: BitchatPeer, isMe: Bool, hasUnread: Bool, enc: EncryptionStatus)] = viewModel.allBitchatPeers.map { bitchatPeer in
                 let isMe = bitchatPeer.id == myPeerID
                 let hasUnread = viewModel.hasUnreadMessages(for: Peer(str: bitchatPeer.id))
                 let enc = viewModel.getEncryptionStatus(for: Peer(str: bitchatPeer.id))
