@@ -56,7 +56,7 @@ struct ContentView: View {
     // Timer-based refresh removed; use LocationChannelManager live updates instead
     // Window sizes for rendering (infinite scroll up)
     @State private var windowCountPublic: Int = 300
-    @State private var windowCountPrivate: [String: Int] = [:]
+    @State private var windowCountPrivate: [Peer: Int] = [:]
     
     // MARK: - Computed Properties
     
@@ -256,15 +256,14 @@ struct ContentView: View {
     
     // MARK: - Message List View
     
-    private func messagesView(privatePeer: String?, isAtBottom: Binding<Bool>) -> some View {
+    private func messagesView(privatePeer: Peer?, isAtBottom: Binding<Bool>) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     // Extract messages based on context (private or public chat)
                     let messages: [BitchatMessage] = {
-                        if let privatePeer = privatePeer {
-                            let msgs = viewModel.getPrivateChatMessages(for: Peer(str: privatePeer))
-                            return msgs
+                        if let privatePeer {
+                            return viewModel.getPrivateChatMessages(for: privatePeer)
                         } else {
                             return viewModel.messages
                         }
@@ -279,7 +278,7 @@ struct ContentView: View {
 
                     // Build stable UI IDs with a context key to avoid ID collisions when switching channels
                     let contextKey: String = {
-                        if let peer = privatePeer { return "dm:\(peer)" }
+                        if let peer = privatePeer { return "dm:\(peer.id)" }
                         switch locationManager.selectedChannel {
                         case .mesh: return "mesh"
                         case .location(let ch): return "geo:\(ch.geohash)"
@@ -383,7 +382,7 @@ struct ContentView: View {
                             if message.id == windowedMessages.first?.id, messages.count > windowedMessages.count {
                                 let step = TransportConfig.uiWindowStepCount
                                 let contextKey: String = {
-                                    if let peer = privatePeer { return "dm:\(peer)" }
+                                    if let peer = privatePeer { return "dm:\(peer.id)" }
                                     switch locationManager.selectedChannel {
                                     case .mesh: return "mesh"
                                     case .location(let ch): return "geo:\(ch.geohash)"
@@ -503,8 +502,8 @@ struct ContentView: View {
                 // Force scroll to bottom when opening a chat view
                 let targetID: String? = {
                     if let peer = privatePeer,
-                       let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
-                        return "dm:\(peer)|\(last)"
+                       let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                        return "dm:\(peer.id)|\(last)"
                     }
                     let contextKey: String = {
                         switch locationManager.selectedChannel {
@@ -523,8 +522,8 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     let targetID2: String? = {
                         if let peer = privatePeer,
-                           let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
-                            return "dm:\(peer)|\(last)"
+                           let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                            return "dm:\(peer.id)|\(last)"
                         }
                         let contextKey: String = {
                             switch locationManager.selectedChannel {
@@ -542,8 +541,8 @@ struct ContentView: View {
                 // When switching to a different private chat, jump to bottom
                 let targetID: String? = {
                     if let peer = privatePeer,
-                       let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
-                        return "dm:\(peer)|\(last)"
+                       let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                        return "dm:\(peer.id)|\(last)"
                     }
                     let contextKey: String = {
                         switch locationManager.selectedChannel {
@@ -608,8 +607,8 @@ struct ContentView: View {
                 }
             }
             .onChange(of: viewModel.privateChats) { _ in
-                if let peerID = privatePeer,
-                   let messages = viewModel.privateChats[Peer(str: peerID)],
+                if let peer = privatePeer,
+                   let messages = viewModel.privateChats[peer],
                    !messages.isEmpty {
                     // If the newest private message is from me, always scroll
                     let lastMsg = messages.last!
@@ -624,8 +623,8 @@ struct ContentView: View {
                     let now = Date()
                     if now.timeIntervalSince(lastScrollTime) > TransportConfig.uiScrollThrottleSeconds {
                         lastScrollTime = now
-                        let contextKey = "dm:\(peerID)"
-                        let count = windowCountPrivate[peerID] ?? 300
+                        let contextKey = "dm:\(peer.id)"
+                        let count = windowCountPrivate[peer] ?? 300
                         let target = messages.suffix(count).last.map { "\(contextKey)|\($0.id)" }
                         DispatchQueue.main.async {
                             if let target = target { proxy.scrollTo(target, anchor: .bottom) }
@@ -634,8 +633,8 @@ struct ContentView: View {
                         scrollThrottleTimer?.invalidate()
                         scrollThrottleTimer = Timer.scheduledTimer(withTimeInterval: TransportConfig.uiScrollThrottleSeconds, repeats: false) { _ in
                             lastScrollTime = Date()
-                            let contextKey = "dm:\(peerID)"
-                            let count = windowCountPrivate[peerID] ?? 300
+                            let contextKey = "dm:\(peer.id)"
+                            let count = windowCountPrivate[peer] ?? 300
                             let target = messages.suffix(count).last.map { "\(contextKey)|\($0.id)" }
                             DispatchQueue.main.async {
                                 if let target = target { proxy.scrollTo(target, anchor: .bottom) }
@@ -664,16 +663,16 @@ struct ContentView: View {
             }
             .onAppear {
                 // Also check when view appears
-                if let peerID = privatePeer {
+                if let peer = privatePeer {
                     // Try multiple times to ensure read receipts are sent
-                    viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
+                    viewModel.markPrivateMessagesAsRead(from: peer)
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiReadReceiptRetryShortSeconds) {
-                        viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
+                        viewModel.markPrivateMessagesAsRead(from: peer)
                     }
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiReadReceiptRetryLongSeconds) {
-                        viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
+                        viewModel.markPrivateMessagesAsRead(from: peer)
                     }
                 }
             }
@@ -1037,7 +1036,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 privateHeaderView
                 Divider()
-                messagesView(privatePeer: viewModel.selectedPrivateChatPeer?.id, isAtBottom: $isAtBottomPrivate)
+                messagesView(privatePeer: viewModel.selectedPrivateChatPeer, isAtBottom: $isAtBottomPrivate)
                 Divider()
                 inputView
             }
