@@ -20,6 +20,10 @@ extension Peer {
         id.data(using: .utf8)
     }
     
+    var isEmpty: Bool {
+        id.isEmpty
+    }
+    
     /// Returns true if `id` starts with "`nostr`"
     var isNostr: Bool {
         id.hasPrefix("nostr")

@@ -4164,30 +4164,30 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     //
 
     
-    // Helper to resolve nickname for a peer ID through various sources
+    /// Helper to resolve nickname for a peer through various sources
     @MainActor
-    func resolveNickname(for peerID: String) -> String {
+    func resolveNickname(for peer: Peer) -> String {
         // Guard against empty or very short peer IDs
-        guard !peerID.isEmpty else {
+        guard !peer.isEmpty else {
             return "unknown"
         }
         
         // Check if this might already be a nickname (not a hex peer ID)
         // Peer IDs are hex strings, so they only contain 0-9 and a-f
-        let isHexID = peerID.allSatisfy { $0.isHexDigit }
+        let isHexID = peer.id.allSatisfy { $0.isHexDigit }
         if !isHexID {
             // If it's already a nickname, just return it
-            return peerID
+            return peer.id
         }
         
         // First try direct peer nicknames from mesh service
         let peerNicknames = meshService.getPeerNicknames()
-        if let nickname = peerNicknames[Peer(str: peerID)] {
+        if let nickname = peerNicknames[peer] {
             return nickname
         }
         
         // Try to resolve through fingerprint and social identity
-        if let fingerprint = getFingerprint(for: Peer(str: peerID)) {
+        if let fingerprint = getFingerprint(for: peer) {
             if let identity = identityManager.getSocialIdentity(for: fingerprint) {
                 // Prefer local petname if set
                 if let petname = identity.localPetname {
@@ -4200,8 +4200,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Use anonymous with shortened peer ID
         // Ensure we have at least 4 characters for the prefix
-        let prefixLength = min(4, peerID.count)
-        let prefix = String(peerID.prefix(prefixLength))
+        let prefixLength = min(4, peer.id.count)
+        let prefix = String(peer.id.prefix(prefixLength))
         
         // Avoid "anonanon" by checking if ID already starts with "anon"
         if prefix.starts(with: "anon") {
@@ -4418,7 +4418,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         let last = lastMutualToastAt[fp] ?? .distantPast
                         if now.timeIntervalSince(last) > 60 { // 1-minute throttle
                             lastMutualToastAt[fp] = now
-                            let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname ?? resolveNickname(for: peer.id)
+                            let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname ?? resolveNickname(for: peer)
                             NotificationService.shared.sendLocalNotification(
                                 title: "Mutual verification",
                                 body: "You and \(name) verified each other",
@@ -4444,7 +4444,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         identityManager.setVerified(fingerprint: fp, verified: true)
                         identityManager.forceSave()
                         verifiedFingerprints.insert(fp)
-                        let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname ?? resolveNickname(for: peer.id)
+                        let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname ?? resolveNickname(for: peer)
                         NotificationService.shared.sendLocalNotification(
                             title: "Verified",
                             body: "You verified \(name)",
