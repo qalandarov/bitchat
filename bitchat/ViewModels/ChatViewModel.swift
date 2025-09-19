@@ -371,7 +371,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Caches
     
     // Caches for expensive computations
-    private var encryptionStatusCache: [String: EncryptionStatus] = [:] // key: peerID
+    private var encryptionStatusCache: [Peer: EncryptionStatus] = [:]
     
     // MARK: - Social Features (Delegated to PeerStateManager)
     
@@ -383,9 +383,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Encryption and Security
     
     // Noise Protocol encryption status
-    @Published var peerEncryptionStatus: [String: EncryptionStatus] = [:]  // peerID -> encryption status
+    @Published var peerEncryptionStatus: [Peer: EncryptionStatus] = [:]
     @Published var verifiedFingerprints: Set<String> = []  // Set of verified fingerprints
-    @Published var showingFingerprintFor: String? = nil  // Currently showing fingerprint sheet for peer
+    @Published var showingFingerprintFor: Peer? = nil  // Currently showing fingerprint sheet for peer
     
     // Bluetooth state management
     @Published var showBluetoothAlert = false
@@ -3669,16 +3669,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // Check if fingerprint is verified using our persisted data
             if let fingerprint = getFingerprint(for: peer),
                verifiedFingerprints.contains(fingerprint) {
-                peerEncryptionStatus[peer.id] = .noiseVerified
+                peerEncryptionStatus[peer] = .noiseVerified
             } else {
-                peerEncryptionStatus[peer.id] = .noiseSecured
+                peerEncryptionStatus[peer] = .noiseSecured
             }
         } else if noiseService.hasSession(with: peer) {
             // Session exists but not established - handshaking
-            peerEncryptionStatus[peer.id] = .noiseHandshaking
+            peerEncryptionStatus[peer] = .noiseHandshaking
         } else {
             // No session at all
-            peerEncryptionStatus[peer.id] = Optional.none
+            peerEncryptionStatus[peer] = Optional.none
         }
         
         // Invalidate cache when encryption status changes
@@ -3690,7 +3690,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     func getEncryptionStatus(for peer: Peer) -> EncryptionStatus {
         // Check cache first
-        if let cachedStatus = encryptionStatusCache[peer.id] {
+        if let cachedStatus = encryptionStatusCache[peer] {
             return cachedStatus
         }
         
@@ -3763,7 +3763,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Cache the result
-        encryptionStatusCache[peer.id] = status
+        encryptionStatusCache[peer] = status
         
         // Encryption status determined: \(status)
         
@@ -3773,7 +3773,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // Clear caches when data changes
     private func invalidateEncryptionCache(for peer: Peer? = nil) {
         if let peer {
-            encryptionStatusCache.removeValue(forKey: peer.id)
+            encryptionStatusCache.removeValue(forKey: peer)
         } else {
             encryptionStatusCache.removeAll()
         }
@@ -4121,18 +4121,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if noiseService.hasEstablishedSession(with: peer) {
             if let fingerprint = getFingerprint(for: peer) {
                 if verifiedFingerprints.contains(fingerprint) {
-                    peerEncryptionStatus[peer.id] = .noiseVerified
+                    peerEncryptionStatus[peer] = .noiseVerified
                 } else {
-                    peerEncryptionStatus[peer.id] = .noiseSecured
+                    peerEncryptionStatus[peer] = .noiseSecured
                 }
             } else {
                 // Session established but no fingerprint yet
-                peerEncryptionStatus[peer.id] = .noiseSecured
+                peerEncryptionStatus[peer] = .noiseSecured
             }
         } else if noiseService.hasSession(with: peer) {
-            peerEncryptionStatus[peer.id] = .noiseHandshaking
+            peerEncryptionStatus[peer] = .noiseHandshaking
         } else {
-            peerEncryptionStatus[peer.id] = Optional.none
+            peerEncryptionStatus[peer] = nil
         }
         
         // Invalidate cache when encryption status changes
@@ -4144,7 +4144,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Fingerprint Management
     
     func showFingerprint(for peer: Peer) {
-        showingFingerprintFor = peer.id
+        showingFingerprintFor = peer
     }
     
     // MARK: - Peer Lookup Helpers
@@ -4268,10 +4268,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
                 // Update encryption status
                 if self.verifiedFingerprints.contains(fingerprint) {
-                    self.peerEncryptionStatus[peerID] = .noiseVerified
+                    self.peerEncryptionStatus[Peer(str: peerID)] = .noiseVerified
                     // Encryption: noiseVerified
                 } else {
-                    self.peerEncryptionStatus[peerID] = .noiseSecured
+                    self.peerEncryptionStatus[Peer(str: peerID)] = .noiseSecured
                     // Encryption: noiseSecured
                 }
 
@@ -4303,7 +4303,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         noiseService.onHandshakeRequired = { [weak self] peerID in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                self.peerEncryptionStatus[peerID] = .noiseHandshaking
+                self.peerEncryptionStatus[Peer(str: peerID)] = .noiseHandshaking
                 
                 // Invalidate cache when encryption status changes
                 self.invalidateEncryptionCache(for: Peer(str: peerID))
