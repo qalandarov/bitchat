@@ -92,7 +92,7 @@ final class CommandProcessor {
         
         if parts.count > 1 {
             let message = String(parts[1])
-            chatViewModel?.sendPrivateMessage(message, to: peerID)
+            chatViewModel?.sendPrivateMessage(message, to: Peer(str: peerID))
         }
         
         return .success(message: "started private chat with \(nickname)")

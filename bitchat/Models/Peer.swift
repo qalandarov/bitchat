@@ -20,12 +20,19 @@ extension Peer {
         id.data(using: .utf8)
     }
     
+    /// Returns true if `id` starts with "`nostr`"
     var isNostr: Bool {
         id.hasPrefix("nostr")
     }
     
+    /// Returns true if `id` starts with "`nostr:`"
     var isNostrColon: Bool {
         id.hasPrefix("nostr:")
+    }
+    
+    /// Returns true if `id` starts with "`nostr_`"
+    var isNostrUnderscore: Bool {
+        id.hasPrefix("nostr_")
     }
 }
 

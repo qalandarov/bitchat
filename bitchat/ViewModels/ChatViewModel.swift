@@ -1387,7 +1387,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             updatePrivateChatPeerIfNeeded()
             
             if let selectedPeer = selectedPrivateChatPeer {
-                sendPrivateMessage(content, to: selectedPeer)
+                sendPrivateMessage(content, to: Peer(str: selectedPeer))
             }
             return
         }
@@ -2163,34 +2163,34 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Sends an encrypted private message to a specific peer.
     /// - Parameters:
     ///   - content: The message content to encrypt and send
-    ///   - peerID: The recipient's peer ID
+    ///   - peer: The recipient's peer
     /// - Note: Automatically establishes Noise encryption if not already active
     @MainActor
-    func sendPrivateMessage(_ content: String, to peerID: String) {
+    func sendPrivateMessage(_ content: String, to peer: Peer) {
         guard !content.isEmpty else { return }
         
         // Check if blocked
-        if unifiedPeerService.isBlocked(Peer(str: peerID)) {
-            let nickname = meshService.peerNickname(peer: Peer(str: peerID)) ?? "user"
+        if unifiedPeerService.isBlocked(peer) {
+            let nickname = meshService.peerNickname(peer: peer) ?? "user"
             addSystemMessage("cannot send message to \(nickname): user is blocked.")
             return
         }
         
         // Geohash DM routing: conversation keys start with "nostr_"
-        if peerID.hasPrefix("nostr_") {
-            sendGeohashDM(content, to: peerID)
+        if peer.isNostrUnderscore {
+            sendGeohashDM(content, to: peer.id)
         }
         
         // Determine routing method and recipient nickname
-        guard let noiseKey = Data(hexString: peerID) else { return }
-        let isConnected = meshService.isPeerConnected(Peer(str: peerID))
-        let isReachable = meshService.isPeerReachable(Peer(str: peerID))
+        guard let noiseKey = Data(hexString: peer.id) else { return }
+        let isConnected = meshService.isPeerConnected(peer)
+        let isReachable = meshService.isPeerReachable(peer)
         let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey)
         let isMutualFavorite = favoriteStatus?.isMutual ?? false
         let hasNostrKey = favoriteStatus?.peerNostrPublicKey != nil
         
         // Get nickname from various sources
-        var recipientNickname = meshService.peerNickname(peer: Peer(str: peerID))
+        var recipientNickname = meshService.peerNickname(peer: peer)
         if recipientNickname == nil && favoriteStatus != nil {
             recipientNickname = favoriteStatus?.peerNickname
         }
@@ -2215,26 +2215,26 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         )
         
         // Add to local chat
-        if privateChats[peerID] == nil {
-            privateChats[peerID] = []
+        if privateChats[peer.id] == nil {
+            privateChats[peer.id] = []
         }
-        privateChats[peerID]?.append(message)
-        trimPrivateChatMessagesIfNeeded(for: peerID)
+        privateChats[peer.id]?.append(message)
+        trimPrivateChatMessagesIfNeeded(for: peer.id)
         
         // Trigger UI update for sent message
         objectWillChange.send()
         
         // Send via appropriate transport (BLE if connected/reachable, else Nostr when possible)
         if isConnected || isReachable || (isMutualFavorite && hasNostrKey) {
-            messageRouter.sendPrivate(content, to: Peer(str: peerID), recipientNickname: recipientNickname ?? "user", messageID: messageID)
+            messageRouter.sendPrivate(content, to: peer, recipientNickname: recipientNickname ?? "user", messageID: messageID)
             // Optimistically mark as sent for both transports; delivery/read will update subsequently
-            if let idx = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[idx].deliveryStatus = .sent
+            if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[idx].deliveryStatus = .sent
             }
         } else {
             // Update delivery status to failed
-            if let index = privateChats[peerID]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peerID]?[index].deliveryStatus = .failed(reason: "Peer not reachable")
+            if let index = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer.id]?[index].deliveryStatus = .failed(reason: "Peer not reachable")
             }
             addSystemMessage("Cannot send message to \(recipientNickname ?? "user") - peer is not reachable via mesh or Nostr.")
         }
