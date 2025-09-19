@@ -178,7 +178,7 @@ struct ContentView: View {
             set: { _ in viewModel.showingFingerprintFor = nil }
         )) {
             if let peer = viewModel.showingFingerprintFor {
-                FingerprintView(viewModel: viewModel, peerID: peer.id)
+                FingerprintView(viewModel: viewModel, peer: peer)
             }
         }
         .confirmationDialog(
