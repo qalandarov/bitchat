@@ -432,7 +432,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let startedAt: Date
         var sent: Bool
     }
-    private var pendingQRVerifications: [String: PendingVerification] = [:] // peerID -> pending
+    private var pendingQRVerifications: [Peer: PendingVerification] = [:]
     // Last handled challenge nonce per peer to avoid duplicate responses
     private var lastVerifyNonceByPeer: [String: Data] = [:]
     // Track when we last received a verify challenge from a peer (fingerprint-keyed)
@@ -4287,10 +4287,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
 
                 // If a QR verification is pending but not sent yet, send it now that session is authenticated
-                if var pending = self.pendingQRVerifications[peerID], pending.sent == false {
+                if var pending = self.pendingQRVerifications[Peer(str: peerID)], pending.sent == false {
                     self.meshService.sendVerifyChallenge(to: Peer(str: peerID), noiseKeyHex: pending.noiseKeyHex, nonceA: pending.nonceA)
                     pending.sent = true
-                    self.pendingQRVerifications[peerID] = pending
+                    self.pendingQRVerifications[Peer(str: peerID)] = pending
                     SecureLogger.debug("📤 Sent deferred verify challenge to \(peerID) after handshake", category: .security)
                 }
 
@@ -4429,12 +4429,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             case .verifyResponse:
                 guard let resp = VerificationService.shared.parseVerifyResponse(payload) else { return }
                 // Check pending for this peer
-                guard let pending = pendingQRVerifications[peer.id] else { return }
+                guard let pending = pendingQRVerifications[peer] else { return }
                 guard resp.noiseKeyHex.lowercased() == pending.noiseKeyHex.lowercased(), resp.nonceA == pending.nonceA else { return }
                 // Verify signature with expected sign key
                 let ok = VerificationService.shared.verifyResponseSignature(noiseKeyHex: resp.noiseKeyHex, nonceA: resp.nonceA, signature: resp.signature, signerPublicKeyHex: pending.signKeyHex)
                 if ok {
-                    pendingQRVerifications.removeValue(forKey: peer.id)
+                    pendingQRVerifications.removeValue(forKey: peer)
                     if let fp = getFingerprint(for: peer) {
                         let short = fp.prefix(8)
                         SecureLogger.info("🔐 Marking verified fingerprint: \(short)", category: .security)
@@ -4494,27 +4494,27 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     func beginQRVerification(with qr: VerificationService.VerificationQR) -> Bool {
         // Find a matching peer by Noise key
         let targetNoise = qr.noiseKeyHex.lowercased()
-        guard let peer = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey.hexEncodedString().lowercased() == targetNoise }) else {
+        guard let bitchatPeer = unifiedPeerService.bitchatPeers.first(where: { $0.noisePublicKey.hexEncodedString().lowercased() == targetNoise }) else {
             return false
         }
-        let peerID = peer.id
+        let peer = Peer(str: bitchatPeer.id)
         // If we already have a pending verification with this peer, don't send another
-        if pendingQRVerifications[peerID] != nil {
+        if pendingQRVerifications[peer] != nil {
             return true
         }
         // Generate nonceA
         var nonce = Data(count: 16)
         _ = nonce.withUnsafeMutableBytes { SecRandomCopyBytes(kSecRandomDefault, 16, $0.baseAddress!) }
         var pending = PendingVerification(noiseKeyHex: qr.noiseKeyHex, signKeyHex: qr.signKeyHex, nonceA: nonce, startedAt: Date(), sent: false)
-        pendingQRVerifications[peerID] = pending
+        pendingQRVerifications[peer] = pending
         // If Noise session is established, send immediately; otherwise trigger handshake and send on auth
         let noise = meshService.getNoiseService()
-        if noise.hasEstablishedSession(with: Peer(str: peerID)) {
-            meshService.sendVerifyChallenge(to: Peer(str: peerID), noiseKeyHex: qr.noiseKeyHex, nonceA: nonce)
+        if noise.hasEstablishedSession(with: peer) {
+            meshService.sendVerifyChallenge(to: peer, noiseKeyHex: qr.noiseKeyHex, nonceA: nonce)
             pending.sent = true
-            pendingQRVerifications[peerID] = pending
+            pendingQRVerifications[peer] = pending
         } else {
-            meshService.triggerHandshake(with: Peer(str: peerID))
+            meshService.triggerHandshake(with: peer)
         }
         return true
     }
