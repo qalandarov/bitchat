@@ -1504,15 +1504,17 @@ struct ContentView: View {
                         
                         // Favorite button (hidden for geohash DMs)
                         if !(privatePeerID.hasPrefix("nostr_")) {
+                            let headerPeer = Peer(str: headerPeerID)
+                            let isFavorite = viewModel.isFavorite(peer: headerPeer)
                             Button(action: {
-                                viewModel.toggleFavorite(peer: Peer(str: headerPeerID))
+                                viewModel.toggleFavorite(peer: headerPeer)
                             }) {
-                                Image(systemName: viewModel.isFavorite(peerID: headerPeerID) ? "star.fill" : "star")
+                                Image(systemName: isFavorite ? "star.fill" : "star")
                                     .font(.system(size: 16))
-                                    .foregroundColor(viewModel.isFavorite(peerID: headerPeerID) ? Color.yellow : textColor)
+                                    .foregroundColor(isFavorite ? Color.yellow : textColor)
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel(viewModel.isFavorite(peerID: privatePeerID) ? "Remove from favorites" : "Add to favorites")
+                            .accessibilityLabel(isFavorite ? "Remove from favorites" : "Add to favorites")
                             .accessibilityHint("Double tap to toggle favorite status")
                         }
                     }

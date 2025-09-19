@@ -1260,16 +1260,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func isFavorite(peerID: String) -> Bool {
+    func isFavorite(peer: Peer) -> Bool {
         // Distinguish between ephemeral peer IDs (16 hex chars) and Noise public keys (64 hex chars)
-        if peerID.count == 64, let noisePublicKey = Data(hexString: peerID) {
+        if let noisePublicKey = peer.noiseKey {
             // This is a Noise public key
             if let status = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey) {
                 return status.isFavorite
             }
         } else {
             // This is an ephemeral peer ID - check with UnifiedPeerService
-            if let bitchatPeer = unifiedPeerService.getBitchatPeer(for: Peer(str: peerID)) {
+            if let bitchatPeer = unifiedPeerService.getBitchatPeer(for: peer) {
                 return bitchatPeer.isFavorite
             }
         }
