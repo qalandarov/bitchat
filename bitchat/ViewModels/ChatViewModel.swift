@@ -1390,12 +1390,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Add message to local display
         var displaySender = nickname
-        var localSenderPeerID = meshService.myPeer.id
+        var localSenderPeer = meshService.myPeer
         if case .location(let ch) = activeChannel,
            let myGeoIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
             let suffix = String(myGeoIdentity.publicKeyHex.suffix(4))
             displaySender = nickname + "#" + suffix
-            localSenderPeerID = "nostr:\(myGeoIdentity.publicKeyHex.prefix(TransportConfig.nostrShortKeyDisplayLength))"
+            localSenderPeer = "nostr:\(myGeoIdentity.publicKeyHex.prefix(TransportConfig.nostrShortKeyDisplayLength))"
         }
 
         let message = BitchatMessage(
@@ -1403,7 +1403,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             content: trimmed,
             timestamp: Date(),
             isRelay: false,
-            senderPeer: Peer(str: localSenderPeerID),
+            senderPeer: localSenderPeer,
             mentions: mentions.isEmpty ? nil : mentions
         )
         
@@ -2476,7 +2476,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // These are messages received via Nostr when we didn't know the sender's Noise key
         // They're stored under "nostr_" + first 16 chars of Nostr pubkey
         let currentPeerNickname = peerNickname.lowercased()
-        var tempPeerIDsToConsolidate: [String] = []
+        var tempPeersToConsolidate: [Peer] = []
         
         // Find all temporary Nostr peer IDs that have messages from the same nickname
         for (storedPeer, messages) in privateChats {
@@ -2487,13 +2487,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     msg.sender.lowercased() == currentPeerNickname
                 }
                 if nicknamesMatch && !messages.isEmpty {
-                    tempPeerIDsToConsolidate.append(storedPeer.id)
+                    tempPeersToConsolidate.append(storedPeer)
                 }
             }
         }
         
         // Consolidate messages from temporary Nostr peer IDs
-        if !tempPeerIDsToConsolidate.isEmpty {
+        if !tempPeersToConsolidate.isEmpty {
             if privateChats[peer] == nil {
                 privateChats[peer] = []
             }
@@ -2502,8 +2502,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             var consolidatedCount = 0
             
             var hadUnreadTemp = false
-            for tempPeerID in tempPeerIDsToConsolidate {
-                let tempPeer = Peer(str: tempPeerID)
+            for tempPeer in tempPeersToConsolidate {
                 // Check if this temp peer ID had unread messages
                 if unreadPrivateMessages.contains(tempPeer) {
                     hadUnreadTemp = true
@@ -2627,9 +2626,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Also update in private chats if it's a private message
-        for (peerID, chatMessages) in privateChats {
+        for (peer, chatMessages) in privateChats {
             if let index = chatMessages.firstIndex(where: { $0.id == messageId }) {
-                privateChats[peerID]?[index].deliveryStatus = DeliveryStatus.delivered(to: "nostr", at: Date())
+                privateChats[peer]?[index].deliveryStatus = DeliveryStatus.delivered(to: "nostr", at: Date())
                 // UI will update automatically
                 break
             }
@@ -2903,11 +2902,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: oldNoiseKey) {
                 let peerNickname = favoriteStatus.peerNickname
                 
-                // Search for the current peer ID with the same nickname
-                for (currentPeerID, currentNickname) in meshService.getPeerNicknames() {
+                // Search for the current peer with the same nickname
+                for (currentPeer, currentNickname) in meshService.getPeerNicknames() {
                     if currentNickname == peerNickname {
-                        SecureLogger.info("📖 Resolved updated peer ID for read receipt: \(peer) -> \(currentPeerID)", category: .session)
-                        actualPeer = currentPeerID
+                        SecureLogger.info("📖 Resolved updated peer ID for read receipt: \(peer.id) -> \(currentPeer.id)", category: .session)
+                        actualPeer = currentPeer
                         break
                     }
                 }
@@ -4824,14 +4823,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Update in private chats
-        for (peerID, chatMessages) in privateChats {
+        for (peer, chatMessages) in privateChats {
             guard let index = chatMessages.firstIndex(where: { $0.id == messageID }) else { continue }
             
             let currentStatus = chatMessages[index].deliveryStatus
             guard !shouldSkipUpdate(currentStatus: currentStatus, newStatus: status) else { continue }
             
             // Update delivery status directly (BitchatMessage is a class/reference type)
-            privateChats[peerID]?[index].deliveryStatus = status
+            privateChats[peer]?[index].deliveryStatus = status
         }
         
         // Trigger UI update for delivery status change
