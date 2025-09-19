@@ -3822,9 +3822,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     // MARK: - Peer List Minimal-Distance Palette
-    private var peerPaletteLight: [String: (slot: Int, ring: Int, hue: Double)] = [:]
-    private var peerPaletteDark: [String: (slot: Int, ring: Int, hue: Double)] = [:]
-    private var peerPaletteSeeds: [String: String] = [:] // peerID -> seed used
+    private var peerPaletteLight: [Peer: (slot: Int, ring: Int, hue: Double)] = [:]
+    private var peerPaletteDark: [Peer: (slot: Int, ring: Int, hue: Double)] = [:]
+    private var peerPaletteSeeds: [Peer: String] = [:] // Peer -> seed used
 
     @MainActor
     private func meshSeed(for peer: Peer) -> String {
@@ -3839,7 +3839,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Ensure palette up to date for current peer set and seeds
         rebuildPeerPaletteIfNeeded()
 
-        let entry = (isDark ? peerPaletteDark[peer.id] : peerPaletteLight[peer.id])
+        let entry = (isDark ? peerPaletteDark[peer] : peerPaletteLight[peer])
         let orange = Color.orange
         if peer == meshService.myPeer { return orange }
         let saturation: Double = isDark ? 0.80 : 0.70
@@ -3856,10 +3856,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func rebuildPeerPaletteIfNeeded() {
         // Build current peer->seed map (excluding self)
-        let myID = meshService.myPeer.id
-        var currentSeeds: [String: String] = [:]
-        for p in allBitchatPeers where p.id != myID {
-            currentSeeds[p.id] = meshSeed(for: Peer(str: p.id))
+        let myPeer = meshService.myPeer
+        var currentSeeds: [Peer: String] = [:]
+        for bitchatPeer in allBitchatPeers where bitchatPeer.id != myPeer.id {
+            let peer = Peer(str: bitchatPeer.id)
+            currentSeeds[peer] = meshSeed(for: peer)
         }
         // If seeds unchanged and palette exists for both themes, skip
         if currentSeeds == peerPaletteSeeds,
@@ -3893,23 +3894,23 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Assign slots to peers to maximize minimal distance, deterministically
         let peers = currentSeeds.keys.sorted() // stable order
         // Preferred slot index by seed (wrapping to available slots)
-        let prefIndex: [String: Int] = Dictionary(uniqueKeysWithValues: peers.map { id in
-            let h = (currentSeeds[id] ?? id).djb2()
+        let prefIndex: [Peer: Int] = Dictionary(uniqueKeysWithValues: peers.map { peer in
+            let h = (currentSeeds[peer] ?? peer.id).djb2()
             // Map to available slot range deterministically
             let idx = Int(h % UInt64(slots.count))
-            return (id, idx)
+            return (peer, idx)
         })
 
-        func assign(for seeds: [String: String]) -> [String: (slot: Int, ring: Int, hue: Double)] {
-            var mapping: [String: (slot: Int, ring: Int, hue: Double)] = [:]
+        func assign(for seeds: [Peer: String]) -> [Peer: (slot: Int, ring: Int, hue: Double)] {
+            var mapping: [Peer: (slot: Int, ring: Int, hue: Double)] = [:]
             var usedSlots = Set<Int>()
             var usedHues: [Double] = []
 
             // Keep previous assignments if still valid to minimize churn
             let prev = peerPaletteLight.isEmpty ? peerPaletteDark : peerPaletteLight
-            for (id, entry) in prev {
-                if seeds.keys.contains(id), entry.slot < slots.count { // slot index still valid
-                    mapping[id] = (entry.slot, entry.ring, slots[entry.slot])
+            for (peer, entry) in prev {
+                if seeds.keys.contains(peer), entry.slot < slots.count { // slot index still valid
+                    mapping[peer] = (entry.slot, entry.ring, slots[entry.slot])
                     usedSlots.insert(entry.slot)
                     usedHues.append(slots[entry.slot])
                 }

@@ -162,3 +162,11 @@ extension Peer {
         return self
     }
 }
+
+// MARK: - Comparable
+
+extension Peer: Comparable {
+    static func < (lhs: Peer, rhs: Peer) -> Bool {
+        lhs.id < rhs.id
+    }
+}
