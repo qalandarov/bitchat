@@ -40,7 +40,7 @@ struct ContentView: View {
     @State private var showPrivateChat = false
     @State private var showMessageActions = false
     @State private var selectedMessageSender: String?
-    @State private var selectedMessageSenderID: String?
+    @State private var selectedMessageSenderPeer: Peer?
     @FocusState private var isNicknameFieldFocused: Bool
     @State private var isAtBottomPublic: Bool = true
     @State private var isAtBottomPrivate: Bool = true
@@ -195,13 +195,13 @@ struct ContentView: View {
             }
 
             Button("direct message") {
-                if let peerID = selectedMessageSenderID {
-                    if peerID.hasPrefix("nostr:") {
-                        if let full = viewModel.fullNostrHex(forSender: Peer(str: peerID)) {
+                if let peer = selectedMessageSenderPeer {
+                    if peer.isNostrColon {
+                        if let full = viewModel.fullNostrHex(forSender: peer) {
                             viewModel.startGeohashDM(withPubkeyHex: full)
                         }
                     } else {
-                        viewModel.startPrivateChat(with: Peer(str: peerID))
+                        viewModel.startPrivateChat(with: peer)
                     }
                     withAnimation(.easeInOut(duration: TransportConfig.uiAnimationMediumSeconds)) {
                         showSidebar = false
@@ -224,8 +224,8 @@ struct ContentView: View {
             
             Button("BLOCK", role: .destructive) {
                 // Prefer direct geohash block when we have a Nostr sender ID
-                if let peerID = selectedMessageSenderID, peerID.hasPrefix("nostr:"),
-                   let full = viewModel.fullNostrHex(forSender: Peer(str: peerID)),
+                if let peer = selectedMessageSenderPeer, peer.isNostrColon,
+                   let full = viewModel.fullNostrHex(forSender: peer),
                    let sender = selectedMessageSender {
                     viewModel.blockGeohashUser(pubkeyHexLowercased: full, displayName: sender)
                 } else if let sender = selectedMessageSender {
@@ -447,24 +447,24 @@ struct ContentView: View {
             .onOpenURL { url in
                 guard url.scheme == "bitchat", url.host == "user" else { return }
                 let id = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                let peerID = id.removingPercentEncoding ?? id
-                selectedMessageSenderID = peerID
-                // Derive a stable display name from the peerID instead of peeking at the last message,
+                let peer = Peer(str: id.removingPercentEncoding ?? id)
+                selectedMessageSenderPeer = peer
+                // Derive a stable display name from the peer instead of peeking at the last message,
                 // which may be a transformed system action (sender == "system").
-                if peerID.hasPrefix("nostr") {
+                if peer.isNostr {
                     // For geohash senders, resolve display name via mapping (works for "nostr:" and "nostr_" keys)
-                    selectedMessageSender = viewModel.geohashDisplayName(for: peerID)
+                    selectedMessageSender = viewModel.geohashDisplayName(for: peer.id)
                 } else {
                     // Mesh sender: use current mesh nickname if available; otherwise fall back to last non-system message
-                    if let name = viewModel.meshService.peerNickname(peer: Peer(str: peerID)) {
+                    if let name = viewModel.meshService.peerNickname(peer: peer) {
                         selectedMessageSender = name
                     } else {
-                        selectedMessageSender = viewModel.messages.last(where: { $0.senderPeer?.id == peerID && $0.sender != "system" })?.sender
+                        selectedMessageSender = viewModel.messages.last(where: { $0.senderPeer == peer && $0.sender != "system" })?.sender
                     }
                 }
-                if let peerID = selectedMessageSenderID, viewModel.isSelfSender(peer: Peer(str: peerID), displayName: selectedMessageSender) {
+                if let peer = selectedMessageSenderPeer, viewModel.isSelfSender(peer: peer, displayName: selectedMessageSender) {
                     selectedMessageSender = nil
-                    selectedMessageSenderID = nil
+                    selectedMessageSenderPeer = nil
                 } else {
                     showMessageActions = true
                 }
