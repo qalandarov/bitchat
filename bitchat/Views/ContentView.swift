@@ -967,7 +967,7 @@ struct ContentView: View {
                                      viewModel.toggleFavorite(peer: Peer(str: peerID))
                                  },
                                  onShowFingerprint: { peerID in
-                                     viewModel.showFingerprint(for: peerID)
+                                     viewModel.showFingerprint(for: Peer(str: peerID))
                                  })
                 }
                     }
@@ -1408,7 +1408,7 @@ struct ContentView: View {
         ZStack {
                     // Center content - always perfectly centered
                     Button(action: {
-                        viewModel.showFingerprint(for: headerPeerID)
+                        viewModel.showFingerprint(for: Peer(str: headerPeerID))
                     }) {
                         HStack(spacing: 6) {
                             // Show transport icon based on connection state (like peer list)

@@ -4118,36 +4118,36 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // Update encryption status in appropriate places, not during view updates
     @MainActor
-    private func updateEncryptionStatus(for peerID: String) {
+    private func updateEncryptionStatus(for peer: Peer) {
         let noiseService = meshService.getNoiseService()
         
-        if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
-            if let fingerprint = getFingerprint(for: Peer(str: peerID)) {
+        if noiseService.hasEstablishedSession(with: peer) {
+            if let fingerprint = getFingerprint(for: peer) {
                 if verifiedFingerprints.contains(fingerprint) {
-                    peerEncryptionStatus[peerID] = .noiseVerified
+                    peerEncryptionStatus[peer.id] = .noiseVerified
                 } else {
-                    peerEncryptionStatus[peerID] = .noiseSecured
+                    peerEncryptionStatus[peer.id] = .noiseSecured
                 }
             } else {
                 // Session established but no fingerprint yet
-                peerEncryptionStatus[peerID] = .noiseSecured
+                peerEncryptionStatus[peer.id] = .noiseSecured
             }
-        } else if noiseService.hasSession(with: Peer(str: peerID)) {
-            peerEncryptionStatus[peerID] = .noiseHandshaking
+        } else if noiseService.hasSession(with: peer) {
+            peerEncryptionStatus[peer.id] = .noiseHandshaking
         } else {
-            peerEncryptionStatus[peerID] = Optional.none
+            peerEncryptionStatus[peer.id] = Optional.none
         }
         
         // Invalidate cache when encryption status changes
-        invalidateEncryptionCache(for: Peer(str: peerID))
+        invalidateEncryptionCache(for: peer)
         
         // UI will update automatically via @Published properties
     }
     
     // MARK: - Fingerprint Management
     
-    func showFingerprint(for peerID: String) {
-        showingFingerprintFor = peerID
+    func showFingerprint(for peer: Peer) {
+        showingFingerprintFor = peer.id
     }
     
     // MARK: - Peer Lookup Helpers
@@ -4216,8 +4216,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func verifyFingerprint(for peerID: String) {
-        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return }
+    func verifyFingerprint(for peer: Peer) {
+        guard let fingerprint = getFingerprint(for: peer) else { return }
         
         // Update secure storage with verified status
         identityManager.setVerified(fingerprint: fingerprint, verified: true)
@@ -4226,16 +4226,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         verifiedFingerprints.insert(fingerprint)
         
         // Update encryption status after verification
-        updateEncryptionStatus(for: peerID)
+        updateEncryptionStatus(for: peer)
     }
 
     @MainActor
-    func unverifyFingerprint(for peerID: String) {
-        guard let fingerprint = getFingerprint(for: Peer(str: peerID)) else { return }
+    func unverifyFingerprint(for peer: Peer) {
+        guard let fingerprint = getFingerprint(for: peer) else { return }
         identityManager.setVerified(fingerprint: fingerprint, verified: false)
         identityManager.forceSave()
         verifiedFingerprints.remove(fingerprint)
-        updateEncryptionStatus(for: peerID)
+        updateEncryptionStatus(for: peer)
     }
     
     @MainActor
@@ -4463,7 +4463,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 )
                             }
                         }
-                        updateEncryptionStatus(for: peer.id)
+                        updateEncryptionStatus(for: peer)
                     }
                 }
             }

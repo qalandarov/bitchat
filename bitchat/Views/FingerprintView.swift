@@ -172,7 +172,7 @@ struct FingerprintView: View {
                         
                         if !isVerified {
                             Button(action: {
-                                viewModel.verifyFingerprint(for: peerID)
+                                viewModel.verifyFingerprint(for: Peer(str: peerID))
                                 dismiss()
                             }) {
                                 Text("MARK AS VERIFIED")
@@ -186,7 +186,7 @@ struct FingerprintView: View {
                             .buttonStyle(PlainButtonStyle())
                         } else {
                             Button(action: {
-                                viewModel.unverifyFingerprint(for: peerID)
+                                viewModel.unverifyFingerprint(for: Peer(str: peerID))
                                 dismiss()
                             }) {
                                 Text("REMOVE VERIFICATION")
