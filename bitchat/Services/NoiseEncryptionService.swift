@@ -236,8 +236,8 @@ final class NoiseEncryptionService {
         self.sessionManager = NoiseSessionManager(localStaticKey: staticIdentityKey, keychain: keychain)
         
         // Set up session callbacks
-        sessionManager.onSessionEstablished = { [weak self] peerID, remoteStaticKey in
-            self?.handleSessionEstablished(peer: Peer(str: peerID), remoteStaticKey: remoteStaticKey)
+        sessionManager.onSessionEstablished = { [weak self] peer, remoteStaticKey in
+            self?.handleSessionEstablished(peer: peer, remoteStaticKey: remoteStaticKey)
         }
         
         // Start session maintenance timer

@@ -2720,12 +2720,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             // Then handle favorite/unfavorite messages if applicable
             if let isFavorite = notification.userInfo?["isFavorite"] as? Bool {
-                let peerID = peerPublicKey.hexEncodedString()
                 let action = isFavorite ? "favorited" : "unfavorited"
                 
                 // Find peer nickname
                 let peerNickname: String
-                if let nickname = meshService.peerNickname(peer: Peer(str: peerID)) {
+                if let nickname = meshService.peerNickname(peer: Peer(str: peerPublicKey.hexEncodedString())) {
                     peerNickname = nickname
                 } else if let favorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: peerPublicKey) {
                     peerNickname = favorite.peerNickname

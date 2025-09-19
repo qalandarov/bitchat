@@ -266,8 +266,8 @@ final class NoiseHandshakeCoordinator {
             }
             
             // Clean up stale states
-            for peerID in stalePeers {
-                handshakeStates.removeValue(forKey: peerID)
+            for peer in stalePeers {
+                handshakeStates.removeValue(forKey: peer)
             }
             
             if !stalePeers.isEmpty {
@@ -323,7 +323,7 @@ final class NoiseHandshakeCoordinator {
     func logHandshakeStates() {
         handshakeQueue.sync {
             SecureLogger.debug("=== Handshake States ===", category: .handshake)
-            for (peerID, state) in handshakeStates {
+            for (peer, state) in handshakeStates {
                 let stateDesc: String
                 switch state {
                 case .idle:
@@ -341,7 +341,7 @@ final class NoiseHandshakeCoordinator {
                 case .failed(let reason, let canRetry, let lastAttempt):
                     stateDesc = "failed: \(reason) (canRetry: \(canRetry), last: \(lastAttempt))"
                 }
-                SecureLogger.debug("  \(peerID): \(stateDesc)", category: .handshake)
+                SecureLogger.debug("  \(peer.id): \(stateDesc)", category: .handshake)
             }
             SecureLogger.debug("========================", category: .handshake)
         }

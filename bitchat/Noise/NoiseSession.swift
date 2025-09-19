@@ -267,7 +267,7 @@ final class NoiseSessionManager {
     private let managerQueue = DispatchQueue(label: "chat.bitchat.noise.manager", attributes: .concurrent)
     
     // Callbacks
-    var onSessionEstablished: ((String, Curve25519.KeyAgreement.PublicKey) -> Void)?
+    var onSessionEstablished: ((Peer, Curve25519.KeyAgreement.PublicKey) -> Void)?
     var onSessionFailed: ((String, Error) -> Void)?
     
     init(localStaticKey: Curve25519.KeyAgreement.PrivateKey, keychain: KeychainManagerProtocol) {
@@ -412,7 +412,7 @@ final class NoiseSessionManager {
                     if let remoteKey = session.getRemoteStaticPublicKey() {
                         // Schedule callback outside the synchronized block to prevent deadlock
                         DispatchQueue.global().async { [weak self] in
-                            self?.onSessionEstablished?(peer.id, remoteKey)
+                            self?.onSessionEstablished?(peer, remoteKey)
                         }
                     }
                 }
