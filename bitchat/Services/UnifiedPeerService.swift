@@ -19,7 +19,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     // MARK: - Published Properties
     
     @Published private(set) var bitchatPeers: [BitchatPeer] = []
-    @Published private(set) var connectedPeerIDs: Set<String> = []
+    @Published private(set) var connectedPeers: Set<Peer> = []
     @Published private(set) var favorites: [BitchatPeer] = []
     @Published private(set) var mutualFavorites: [BitchatPeer] = []
     
@@ -78,7 +78,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
         let favorites = favoritesService.favorites
         
         var enrichedPeers: [BitchatPeer] = []
-        var connected: Set<String> = []
+        var connected: Set<Peer> = []
         var addedPeers: Set<Peer> = []
         
         // Phase 1: Add all mesh peers (connected and reachable)
@@ -93,7 +93,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             )
             
             enrichedPeers.append(bitchatPeer)
-            if bitchatPeer.isConnected { connected.insert(peer.id) }
+            if bitchatPeer.isConnected { connected.insert(peer) }
             addedPeers.insert(peer)
             
             // Update fingerprint cache
@@ -156,7 +156,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
             p.isConnected || p.isReachable || p.isMutualFavorite
         }
         self.bitchatPeers = filtered
-        self.connectedPeerIDs = connected
+        self.connectedPeers = connected
         self.favorites = favoritesList
         self.mutualFavorites = mutualsList
         self.peerIndex = newIndex
@@ -239,7 +239,7 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     /// Check if peer is online
     func isOnline(_ peer: Peer) -> Bool {
-        return connectedPeerIDs.contains(peer.id)
+        return connectedPeers.contains(peer)
     }
     
     /// Check if peer is blocked
@@ -376,7 +376,6 @@ final class UnifiedPeerService: ObservableObject, TransportPeerEventsDelegate {
     
     // MARK: - Compatibility Methods (for easy migration)
     
-    var connectedPeers: [String] { Array(connectedPeerIDs) }
     var favoritePeers: Set<String> { 
         Set(favorites.compactMap { getFingerprint(for: Peer(str: $0.id)) })
     }

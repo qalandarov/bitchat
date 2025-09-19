@@ -246,7 +246,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // Computed properties for compatibility
     @MainActor
-    var connectedPeers: [String] { Array(unifiedPeerService.connectedPeerIDs) }
+    var connectedPeers: [Peer] { Array(unifiedPeerService.connectedPeers) }
     @Published var allBitchatPeers: [BitchatPeer] = []
     var privateChats: [String: [BitchatMessage]] { 
         get { privateChatManager.privateChats }
@@ -1280,12 +1280,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     // Helper method to find current peer ID for a fingerprint
     @MainActor
-    private func getCurrentPeerIDForFingerprint(_ fingerprint: String) -> String? {
+    private func getCurrentPeerForFingerprint(_ fingerprint: String) -> Peer? {
         // Search through all connected peers to find the one with matching fingerprint
-        for peerID in connectedPeers {
-            if let mappedFingerprint = peerIDToPublicKeyFingerprint[peerID],
-               mappedFingerprint == fingerprint {
-                return peerID
+        for peer in connectedPeers {
+            if let mappedFingerprint = peerIDToPublicKeyFingerprint[peer.id], mappedFingerprint == fingerprint {
+                return peer
             }
         }
         return nil
@@ -1297,7 +1296,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         guard let chatFingerprint = selectedPrivateChatFingerprint else { return }
         
         // Find current peer ID for the fingerprint
-        if let currentPeerID = getCurrentPeerIDForFingerprint(chatFingerprint) {
+        if let currentPeerID = getCurrentPeerForFingerprint(chatFingerprint)?.id {
             // Update the selected peer if it's different
             if let oldPeerID = selectedPrivateChatPeer?.id, oldPeerID != currentPeerID {
                 
@@ -3651,8 +3650,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     @MainActor
     func updateEncryptionStatusForPeers() {
-        for peerID in connectedPeers {
-            updateEncryptionStatusForPeer(Peer(str: peerID))
+        for peer in connectedPeers {
+            updateEncryptionStatusForPeer(peer)
         }
     }
     
