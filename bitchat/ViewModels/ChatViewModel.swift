@@ -3800,20 +3800,15 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     private func peerColor(for message: BitchatMessage, isDark: Bool) -> Color {
-        if let spid = message.senderPeer?.id {
-            if spid.hasPrefix("nostr:") || spid.hasPrefix("nostr_") {
-                let bare: String = {
-                    if spid.hasPrefix("nostr:") { return String(spid.dropFirst(6)) }
-                    if spid.hasPrefix("nostr_") { return String(spid.dropFirst(6)) }
-                    return spid
-                }()
-                let full = nostrKeyMapping[spid]?.lowercased() ?? bare.lowercased()
+        if let senderPeer = message.senderPeer {
+            if senderPeer.isNostrColon || senderPeer.isNostrUnderscore {
+                let full = nostrKeyMapping[senderPeer.id]?.lowercased() ?? senderPeer.toBare().id.lowercased()
                 return getNostrPaletteColor(for: full, isDark: isDark)
-            } else if spid.count == 16 {
+            } else if senderPeer.isShort {
                 // Mesh short ID
-                return getPeerPaletteColor(for: spid, isDark: isDark)
+                return getPeerPaletteColor(for: senderPeer, isDark: isDark)
             } else {
-                return getPeerPaletteColor(for: spid.lowercased(), isDark: isDark)
+                return getPeerPaletteColor(for: senderPeer, isDark: isDark)
             }
         }
         // Fallback when we only have a display name
@@ -3827,8 +3822,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     @MainActor
-    func colorForMeshPeer(id peerID: String, isDark: Bool) -> Color {
-        return getPeerPaletteColor(for: peerID, isDark: isDark)
+    func colorForMeshPeer(id peer: Peer, isDark: Bool) -> Color {
+        return getPeerPaletteColor(for: peer, isDark: isDark)
     }
 
     private func trimMeshTimelineIfNeeded() {
@@ -3843,21 +3838,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private var peerPaletteSeeds: [String: String] = [:] // peerID -> seed used
 
     @MainActor
-    private func meshSeed(for peerID: String) -> String {
-        if let full = getNoiseKeyForShortID(peerID)?.lowercased() {
+    private func meshSeed(for peer: Peer) -> String {
+        if let full = getNoiseKeyForShortID(peer.id)?.lowercased() {
             return "noise:" + full
         }
-        return peerID.lowercased()
+        return peer.id
     }
 
     @MainActor
-    private func getPeerPaletteColor(for peerID: String, isDark: Bool) -> Color {
+    private func getPeerPaletteColor(for peer: Peer, isDark: Bool) -> Color {
         // Ensure palette up to date for current peer set and seeds
         rebuildPeerPaletteIfNeeded()
 
-        let entry = (isDark ? peerPaletteDark[peerID] : peerPaletteLight[peerID])
+        let entry = (isDark ? peerPaletteDark[peer.id] : peerPaletteLight[peer.id])
         let orange = Color.orange
-        if peerID == meshService.myPeer.id { return orange }
+        if peer == meshService.myPeer { return orange }
         let saturation: Double = isDark ? 0.80 : 0.70
         let baseBrightness: Double = isDark ? 0.75 : 0.45
         let ringDelta = isDark ? TransportConfig.uiPeerPaletteRingBrightnessDeltaDark : TransportConfig.uiPeerPaletteRingBrightnessDeltaLight
@@ -3866,7 +3861,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return Color(hue: e.hue, saturation: saturation, brightness: brightness)
         }
         // Fallback to seed color if not in palette (e.g., transient)
-        return Color(peerSeed: meshSeed(for: peerID), isDark: isDark)
+        return Color(peerSeed: meshSeed(for: peer), isDark: isDark)
     }
 
     @MainActor
@@ -3875,7 +3870,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let myID = meshService.myPeer.id
         var currentSeeds: [String: String] = [:]
         for p in allPeers where p.id != myID {
-            currentSeeds[p.id] = meshSeed(for: p.id)
+            currentSeeds[p.id] = meshSeed(for: Peer(str: p.id))
         }
         // If seeds unchanged and palette exists for both themes, skip
         if currentSeeds == peerPaletteSeeds,

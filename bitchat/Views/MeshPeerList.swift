@@ -41,7 +41,7 @@ struct MeshPeerList: View {
                     let peer = item.peer
                     let isMe = item.isMe
                     HStack(spacing: 4) {
-                        let assigned = viewModel.colorForMeshPeer(id: peer.id, isDark: colorScheme == .dark)
+                        let assigned = viewModel.colorForMeshPeer(id: Peer(str: peer.id), isDark: colorScheme == .dark)
                         let baseColor = isMe ? Color.orange : assigned
                         if isMe {
                             Image(systemName: "person.fill")

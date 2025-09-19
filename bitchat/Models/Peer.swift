@@ -34,6 +34,14 @@ extension Peer {
     var isNostrUnderscore: Bool {
         id.hasPrefix("nostr_")
     }
+    
+    /// Returns self or creates a new peer by dropping the first 6 characters if it starts with either "`nostr:`" or "`nostr_`"
+    func toBare() -> Peer {
+        if isNostrColon || isNostrUnderscore {
+            return Peer(str: id.dropFirst(6))
+        }
+        return self
+    }
 }
 
 // MARK: - Validation
