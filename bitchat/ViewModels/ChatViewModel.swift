@@ -2981,7 +2981,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         if Data(hexString: peer.id) == nil, let bitchatPeer = unifiedPeerService.getBitchatPeer(for: peer) {
                             recipPeer = Peer(str: bitchatPeer.noisePublicKey.hexEncodedString())
                         }
-                        let receipt = ReadReceipt(originalMessageID: message.id, readerID: meshService.myPeer.id, readerNickname: nickname)
+                        let receipt = ReadReceipt(originalMessageID: message.id, reader: meshService.myPeer, readerNickname: nickname)
                         messageRouter.sendReadReceipt(receipt, to: recipPeer)
                         sentReadReceipts.insert(message.id)
                     }
@@ -5223,7 +5223,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         if !sentReadReceipts.contains(message.id) {
             if let key {
-                let receipt = ReadReceipt(originalMessageID: message.id, readerID: meshService.myPeer.id, readerNickname: nickname)
+                let receipt = ReadReceipt(originalMessageID: message.id, reader: meshService.myPeer, readerNickname: nickname)
                 SecureLogger.debug("Viewing chat; sending READ ack for \(message.id.prefix(8))… via router", category: .session)
                 messageRouter.sendReadReceipt(receipt, to: Peer(str: key.hexEncodedString()))
                 sentReadReceipts.insert(message.id)
@@ -5820,7 +5820,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             if !sentReadReceipts.contains(message.id) {
                 let receipt = ReadReceipt(
                     originalMessageID: message.id,
-                    readerID: meshService.myPeer.id,
+                    reader: meshService.myPeer,
                     readerNickname: nickname
                 )
                 
