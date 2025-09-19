@@ -162,7 +162,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }()
                 let full = (nostrKeyMapping[spid] ?? bare).lowercased()
                 return "nostr:" + full
-            } else if spid.count == 16, let full = getNoiseKeyForShortID(spid)?.lowercased() {
+            } else if spid.count == 16, let full = getNoiseKeyForShortPeer(Peer(str: spid))?.lowercased() {
                 return "noise:" + full
             } else {
                 return "mesh:" + spid.lowercased()
@@ -304,15 +304,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // Map stable short peer IDs (16-hex) to full Noise public key hex (64-hex) for session continuity
     private var shortIDToNoiseKey: [String: String] = [:]
 
-    // Resolve full Noise key for a peer's short ID (used by UI header rendering)
+    /// Resolve full Noise key for a peer's short peer (used by UI header rendering)
     @MainActor
-    func getNoiseKeyForShortID(_ shortPeerID: String) -> String? {
-        if let mapped = shortIDToNoiseKey[shortPeerID] { return mapped }
+    func getNoiseKeyForShortPeer(_ shortPeer: Peer) -> String? {
+        if let mapped = shortIDToNoiseKey[shortPeer.id] { return mapped }
         // Fallback: derive from active Noise session if available
-        if shortPeerID.count == 16,
-           let key = meshService.getNoiseService().getPeerPublicKeyData(Peer(str: shortPeerID)) {
+        if shortPeer.isShort, let key = meshService.getNoiseService().getPeerPublicKeyData(shortPeer) {
             let stable = key.hexEncodedString()
-            shortIDToNoiseKey[shortPeerID] = stable
+            shortIDToNoiseKey[shortPeer.id] = stable
             return stable
         }
         return nil
@@ -3831,7 +3830,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     private func meshSeed(for peer: Peer) -> String {
-        if let full = getNoiseKeyForShortID(peer.id)?.lowercased() {
+        if let full = getNoiseKeyForShortPeer(peer)?.lowercased() {
             return "noise:" + full
         }
         return peer.id
