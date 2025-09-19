@@ -1159,20 +1159,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     /// Check if a peer has unread messages, including messages stored under stable Noise keys and temporary Nostr peer IDs
     @MainActor
-    func hasUnreadMessages(for peerID: String) -> Bool {
+    func hasUnreadMessages(for peer: Peer) -> Bool {
         // First check direct unread messages
-        if unreadPrivateMessages.contains(peerID) {
+        if unreadPrivateMessages.contains(peer.id) {
             return true
         }
         
         // Check if messages are stored under the stable Noise key hex
-        if let peer = unifiedPeerService.getPeer(by: peerID) {
-            let noiseKeyHex = peer.noisePublicKey.hexEncodedString()
+        if let bitchatPeer = unifiedPeerService.getPeer(by: peer.id) {
+            let noiseKeyHex = bitchatPeer.noisePublicKey.hexEncodedString()
             if unreadPrivateMessages.contains(noiseKeyHex) {
                 return true
             }
             // Also check for geohash (Nostr) DM conv key if this peer has a known Nostr pubkey
-            if let nostrHex = peer.nostrPublicKey {
+            if let nostrHex = bitchatPeer.nostrPublicKey {
                 let convKey = "nostr_" + String(nostrHex.prefix(TransportConfig.nostrConvKeyPrefixLength))
                 if unreadPrivateMessages.contains(convKey) {
                     return true
@@ -1181,17 +1181,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Get the peer's nickname to check for temporary Nostr peer IDs
-        let peerNickname = meshService.peerNickname(peer: Peer(str: peerID))?.lowercased() ?? ""
+        let peerNickname = meshService.peerNickname(peer: peer)?.lowercased() ?? ""
 
         // Check if any temporary Nostr peer IDs have unread messages from this nickname
-        for unreadPeerID in unreadPrivateMessages {
-            if unreadPeerID.hasPrefix("nostr_") {
-                // Check if messages from this temporary peer match the nickname
-                if let messages = privateChats[unreadPeerID],
-                   let firstMessage = messages.first,
-                   firstMessage.sender.lowercased() == peerNickname {
-                    return true
-                }
+        for unreadPeerID in unreadPrivateMessages where unreadPeerID.hasPrefix("nostr_") {
+            // Check if messages from this temporary peer match the nickname
+            if privateChats[unreadPeerID]?.first?.sender.lowercased() == peerNickname {
+                return true
             }
         }
         

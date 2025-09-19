@@ -22,11 +22,11 @@ struct MeshPeerList: View {
             }
         } else {
             let myPeerID = viewModel.meshService.myPeer.id
-            let mapped: [(peer: BitchatPeer, isMe: Bool, hasUnread: Bool, enc: EncryptionStatus)] = viewModel.allPeers.map { peer in
-                let isMe = peer.id == myPeerID
-                let hasUnread = viewModel.hasUnreadMessages(for: peer.id)
-                let enc = viewModel.getEncryptionStatus(for: peer.id)
-                return (peer, isMe, hasUnread, enc)
+            let mapped: [(peer: BitchatPeer, isMe: Bool, hasUnread: Bool, enc: EncryptionStatus)] = viewModel.allPeers.map { bitchatPeer in
+                let isMe = bitchatPeer.id == myPeerID
+                let hasUnread = viewModel.hasUnreadMessages(for: Peer(str: bitchatPeer.id))
+                let enc = viewModel.getEncryptionStatus(for: bitchatPeer.id)
+                return (bitchatPeer, isMe, hasUnread, enc)
             }
             // Stable visual order without mutating state here
             let currentIDs = mapped.map { $0.peer.id }
