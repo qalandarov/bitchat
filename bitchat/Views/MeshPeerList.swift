@@ -4,9 +4,9 @@ struct MeshPeerList: View {
     @ObservedObject var viewModel: ChatViewModel
     let textColor: Color
     let secondaryTextColor: Color
-    let onTapPeer: (String) -> Void
-    let onToggleFavorite: (String) -> Void
-    let onShowFingerprint: (String) -> Void
+    let onTapPeer: (Peer) -> Void
+    let onToggleFavorite: (Peer) -> Void
+    let onShowFingerprint: (Peer) -> Void
     @Environment(\.colorScheme) var colorScheme
 
     @State private var orderedIDs: [String] = []
@@ -124,7 +124,7 @@ struct MeshPeerList: View {
                         }
 
                         if !isMe {
-                            Button(action: { onToggleFavorite(peer.id) }) {
+                            Button(action: { onToggleFavorite(Peer(str: peer.id)) }) {
                                 Image(systemName: (peer.favoriteStatus?.isFavorite ?? false) ? "star.fill" : "star")
                                     .font(.system(size: 12))
                                     .foregroundColor((peer.favoriteStatus?.isFavorite ?? false) ? .yellow : secondaryTextColor)
@@ -136,8 +136,8 @@ struct MeshPeerList: View {
                     .padding(.vertical, 4)
                     .padding(.top, idx == 0 ? 10 : 0)
                     .contentShape(Rectangle())
-                    .onTapGesture { if !isMe { onTapPeer(peer.id) } }
-                    .onTapGesture(count: 2) { if !isMe { onShowFingerprint(peer.id) } }
+                    .onTapGesture { if !isMe { onTapPeer(Peer(str: peer.id)) } }
+                    .onTapGesture(count: 2) { if !isMe { onShowFingerprint(Peer(str: peer.id)) } }
                 }
             }
             // Seed and update order outside result builder

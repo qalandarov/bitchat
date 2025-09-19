@@ -955,18 +955,18 @@ struct ContentView: View {
                     MeshPeerList(viewModel: viewModel,
                                  textColor: textColor,
                                  secondaryTextColor: secondaryTextColor,
-                                 onTapPeer: { peerID in
-                                     viewModel.startPrivateChat(with: Peer(str: peerID))
+                                 onTapPeer: { peer in
+                                     viewModel.startPrivateChat(with: peer)
                                      withAnimation(.easeInOut(duration: TransportConfig.uiAnimationMediumSeconds)) {
                                          showSidebar = false
                                          sidebarDragOffset = 0
                                      }
                                  },
-                                 onToggleFavorite: { peerID in
-                                     viewModel.toggleFavorite(peer: Peer(str: peerID))
+                                 onToggleFavorite: { peer in
+                                     viewModel.toggleFavorite(peer: peer)
                                  },
-                                 onShowFingerprint: { peerID in
-                                     viewModel.showFingerprint(for: Peer(str: peerID))
+                                 onShowFingerprint: { peer in
+                                     viewModel.showFingerprint(for: peer)
                                  })
                 }
                     }
