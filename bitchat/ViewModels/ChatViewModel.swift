@@ -3667,32 +3667,32 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     func updateEncryptionStatusForPeers() {
         for peerID in connectedPeers {
-            updateEncryptionStatusForPeer(peerID)
+            updateEncryptionStatusForPeer(Peer(str: peerID))
         }
     }
     
     @MainActor
-    func updateEncryptionStatusForPeer(_ peerID: String) {
+    func updateEncryptionStatusForPeer(_ peer: Peer) {
         let noiseService = meshService.getNoiseService()
         
-        if noiseService.hasEstablishedSession(with: Peer(str: peerID)) {
+        if noiseService.hasEstablishedSession(with: peer) {
             // Check if fingerprint is verified using our persisted data
-            if let fingerprint = getFingerprint(for: Peer(str: peerID)),
+            if let fingerprint = getFingerprint(for: peer),
                verifiedFingerprints.contains(fingerprint) {
-                peerEncryptionStatus[peerID] = .noiseVerified
+                peerEncryptionStatus[peer.id] = .noiseVerified
             } else {
-                peerEncryptionStatus[peerID] = .noiseSecured
+                peerEncryptionStatus[peer.id] = .noiseSecured
             }
-        } else if noiseService.hasSession(with: Peer(str: peerID)) {
+        } else if noiseService.hasSession(with: peer) {
             // Session exists but not established - handshaking
-            peerEncryptionStatus[peerID] = .noiseHandshaking
+            peerEncryptionStatus[peer.id] = .noiseHandshaking
         } else {
             // No session at all
-            peerEncryptionStatus[peerID] = Optional.none
+            peerEncryptionStatus[peer.id] = Optional.none
         }
         
         // Invalidate cache when encryption status changes
-        invalidateEncryptionCache(for: peerID)
+        invalidateEncryptionCache(for: peer.id)
         
         // UI will update automatically via @Published properties
     }
