@@ -2980,7 +2980,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Send Nostr read ACKs if peer has Nostr capability
         if peerNostrPubkey != nil {
             // Check messages under both ephemeral peer ID and stable Noise key
-            let messagesToAck = getPrivateChatMessages(for: peer.id)
+            let messagesToAck = getPrivateChatMessages(for: peer)
             
             for message in messagesToAck {
                 // Only send read ACKs for messages from the peer (not our own)
@@ -3003,18 +3003,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func getPrivateChatMessages(for peerID: String) -> [BitchatMessage] {
+    func getPrivateChatMessages(for peer: Peer) -> [BitchatMessage] {
         var combined: [BitchatMessage] = []
 
         // Gather messages under the ephemeral peer ID
-        if let ephemeralMessages = privateChats[peerID] {
+        if let ephemeralMessages = privateChats[peer.id] {
             combined.append(contentsOf: ephemeralMessages)
         }
 
         // Also include messages stored under the stable Noise key (Nostr path)
-        if let peer = unifiedPeerService.getPeer(by: peerID) {
-            let noiseKeyHex = peer.noisePublicKey.hexEncodedString()
-            if noiseKeyHex != peerID, let nostrMessages = privateChats[noiseKeyHex] {
+        if let bitchatPeer = unifiedPeerService.getPeer(by: peer.id) {
+            let noiseKeyHex = bitchatPeer.noisePublicKey.hexEncodedString()
+            if noiseKeyHex != peer.id, let nostrMessages = privateChats[noiseKeyHex] {
                 combined.append(contentsOf: nostrMessages)
             }
         }

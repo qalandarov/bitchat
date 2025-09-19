@@ -263,7 +263,7 @@ struct ContentView: View {
                     // Extract messages based on context (private or public chat)
                     let messages: [BitchatMessage] = {
                         if let privatePeer = privatePeer {
-                            let msgs = viewModel.getPrivateChatMessages(for: privatePeer)
+                            let msgs = viewModel.getPrivateChatMessages(for: Peer(str: privatePeer))
                             return msgs
                         } else {
                             return viewModel.messages
@@ -503,7 +503,7 @@ struct ContentView: View {
                 // Force scroll to bottom when opening a chat view
                 let targetID: String? = {
                     if let peer = privatePeer,
-                       let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                       let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
                         return "dm:\(peer)|\(last)"
                     }
                     let contextKey: String = {
@@ -523,7 +523,7 @@ struct ContentView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     let targetID2: String? = {
                         if let peer = privatePeer,
-                           let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                           let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
                             return "dm:\(peer)|\(last)"
                         }
                         let contextKey: String = {
@@ -542,7 +542,7 @@ struct ContentView: View {
                 // When switching to a different private chat, jump to bottom
                 let targetID: String? = {
                     if let peer = privatePeer,
-                       let last = viewModel.getPrivateChatMessages(for: peer).suffix(300).last?.id {
+                       let last = viewModel.getPrivateChatMessages(for: Peer(str: peer)).suffix(300).last?.id {
                         return "dm:\(peer)|\(last)"
                     }
                     let contextKey: String = {
