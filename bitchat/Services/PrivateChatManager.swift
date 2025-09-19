@@ -14,7 +14,7 @@ import SwiftUI
 final class PrivateChatManager: ObservableObject {
     @Published var privateChats: [String: [BitchatMessage]] = [:]
     @Published var selectedPeer: Peer? = nil
-    @Published var unreadMessages: Set<String> = []
+    @Published var unreadMessages: Set<Peer> = []
     
     private var selectedPeerFingerprint: String? = nil
     var sentReadReceipts: Set<String> = []  // Made accessible for ChatViewModel
@@ -75,7 +75,7 @@ final class PrivateChatManager: ObservableObject {
     
     /// Mark messages from a peer as read
     func markAsRead(from peer: Peer) {
-        unreadMessages.remove(peer.id)
+        unreadMessages.remove(peer)
         
         // Send read receipts for unread messages that haven't been sent yet
         if let messages = privateChats[peer.id] {
