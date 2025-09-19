@@ -741,7 +741,7 @@ struct ContentView: View {
                         (["/w"], nil, "see who's online")
                     ]
                     let isGeoPublic: Bool = { if case .location = locationManager.selectedChannel { return true }; return false }()
-                    let isGeoDM: Bool = (viewModel.selectedPrivateChatPeer?.hasPrefix("nostr_") == true)
+                    let isGeoDM = viewModel.selectedPrivateChatPeer?.isNostrUnderscore == true
                     let favInfo: [(commands: [String], syntax: String?, description: String)] = [
                         (["/fav"], "<nickname>", "add to favorites"),
                         (["/unfav"], "<nickname>", "remove from favorites")
@@ -825,7 +825,7 @@ struct ContentView: View {
                             if case .location = locationManager.selectedChannel { return true }
                             return false
                         }()
-                        let isGeoDM: Bool = (viewModel.selectedPrivateChatPeer?.hasPrefix("nostr_") == true)
+                        let isGeoDM = viewModel.selectedPrivateChatPeer?.isNostrUnderscore == true
                         var commandDescriptions = [
                             ("/block", "block or list blocked peers"),
                             ("/clear", "clear chat messages"),
@@ -1037,7 +1037,7 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 privateHeaderView
                 Divider()
-                messagesView(privatePeer: viewModel.selectedPrivateChatPeer, isAtBottom: $isAtBottomPrivate)
+                messagesView(privatePeer: viewModel.selectedPrivateChatPeer?.id, isAtBottom: $isAtBottomPrivate)
                 Divider()
                 inputView
             }
@@ -1336,8 +1336,8 @@ struct ContentView: View {
     
     private var privateHeaderView: some View {
         Group {
-            if let privatePeerID = viewModel.selectedPrivateChatPeer {
-                privateHeaderContent(for: privatePeerID)
+            if let privatePeer = viewModel.selectedPrivateChatPeer {
+                privateHeaderContent(for: privatePeer.id)
             }
         }
     }

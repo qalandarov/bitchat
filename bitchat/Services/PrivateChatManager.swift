@@ -13,7 +13,7 @@ import SwiftUI
 /// Manages all private chat functionality
 final class PrivateChatManager: ObservableObject {
     @Published var privateChats: [String: [BitchatMessage]] = [:]
-    @Published var selectedPeer: String? = nil
+    @Published var selectedPeer: Peer? = nil
     @Published var unreadMessages: Set<String> = []
     
     private var selectedPeerFingerprint: String? = nil
@@ -32,7 +32,7 @@ final class PrivateChatManager: ObservableObject {
     
     /// Start a private chat with a peer
     func startChat(with peer: Peer) {
-        selectedPeer = peer.id
+        selectedPeer = peer
         
         // Store fingerprint for persistence across reconnections
         if let fingerprint = meshService?.getFingerprint(for: peer) {

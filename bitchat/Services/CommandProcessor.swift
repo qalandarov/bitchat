@@ -42,7 +42,7 @@ final class CommandProcessor {
             case .location: return true
             }
         }()
-        let inGeoDM = (chatViewModel?.selectedPrivateChatPeer?.hasPrefix("nostr_") == true)
+        let inGeoDM = chatViewModel?.selectedPrivateChatPeer?.isNostrUnderscore == true
 
         switch cmd {
         case "/m", "/msg":
@@ -123,8 +123,8 @@ final class CommandProcessor {
     }
     
     private func handleClear() -> CommandResult {
-        if let peerID = chatViewModel?.selectedPrivateChatPeer {
-            chatViewModel?.privateChats[peerID]?.removeAll()
+        if let peer = chatViewModel?.selectedPrivateChatPeer {
+            chatViewModel?.privateChats[peer.id]?.removeAll()
         } else {
             chatViewModel?.clearCurrentPublicTimeline()
         }
