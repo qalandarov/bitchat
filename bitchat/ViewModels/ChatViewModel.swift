@@ -5035,7 +5035,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     noisePayload,
                     actualSenderNoiseKey: actualSenderNoiseKey,
                     senderNickname: senderNickname,
-                    targetPeerID: targetPeerID,
+                    targetPeer: Peer(str: targetPeerID),
                     messageTimestamp: messageTimestamp,
                     senderPubkey: senderPubkey
                 )
@@ -5071,7 +5071,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         _ payload: NoisePayload,
         actualSenderNoiseKey: Data?,
         senderNickname: String,
-        targetPeerID: String,
+        targetPeer: Peer,
         messageTimestamp: Date,
         senderPubkey: String
     ) {
@@ -5087,7 +5087,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
 
-        if isDuplicateMessage(messageId, targetPeerID: targetPeerID) {
+        if isDuplicateMessage(messageId, targetPeer: targetPeer) {
             return
         }
 
@@ -5095,7 +5095,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
         // Is viewing?
         var isViewingThisChat = false
-        if selectedPrivateChatPeer == targetPeerID {
+        if selectedPrivateChatPeer == targetPeer.id {
             isViewingThisChat = true
         } else if let selectedPeer = selectedPrivateChatPeer,
                   let selectedPeerData = unifiedPeerService.getBitchatPeer(for: Peer(str: selectedPeer)),
@@ -5116,12 +5116,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             isRelay: false,
             isPrivate: true,
             recipientNickname: nickname,
-            senderPeer: Peer(str: targetPeerID),
+            senderPeer: targetPeer,
             deliveryStatus: .delivered(to: nickname, at: Date())
         )
         
-        addMessageToPrivateChatsIfNeeded(message, targetPeerID: targetPeerID)
-        mirrorToEphemeralIfNeeded(message, targetPeerID: targetPeerID, key: actualSenderNoiseKey)
+        addMessageToPrivateChatsIfNeeded(message, targetPeer: targetPeer)
+        mirrorToEphemeralIfNeeded(message, targetPeer: targetPeer, key: actualSenderNoiseKey)
 
         sendDeliveryAckViaNostrEmbedded(
             message,
@@ -5135,14 +5135,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         } else if isViewingThisChat {
             handleViewingThisChat(
                 message,
-                targetPeerID: targetPeerID,
+                targetPeer: targetPeer,
                 key: actualSenderNoiseKey,
                 senderPubkey: senderPubkey
             )
         } else {
             markAsUnreadIfNeeded(
                 shouldMarkAsUnread: shouldMarkAsUnread,
-                targetPeerID: targetPeerID,
+                targetPeer: targetPeer,
                 key: actualSenderNoiseKey,
                 isRecentMessage: isRecentMessage,
                 senderNickname: senderNickname,
@@ -5153,8 +5153,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         objectWillChange.send()
     }
     
-    private func isDuplicateMessage(_ messageId: String, targetPeerID: String) -> Bool {
-        if privateChats[targetPeerID]?.contains(where: { $0.id == messageId }) == true {
+    private func isDuplicateMessage(_ messageId: String, targetPeer: Peer) -> Bool {
+        if privateChats[targetPeer.id]?.contains(where: { $0.id == messageId }) == true {
             return true
         }
         for (_, messages) in privateChats where messages.contains(where: { $0.id == messageId }) {
@@ -5163,24 +5163,24 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return false
     }
     
-    private func addMessageToPrivateChatsIfNeeded(_ message: BitchatMessage, targetPeerID: String) {
-        if privateChats[targetPeerID] == nil {
-            privateChats[targetPeerID] = []
+    private func addMessageToPrivateChatsIfNeeded(_ message: BitchatMessage, targetPeer: Peer) {
+        if privateChats[targetPeer.id] == nil {
+            privateChats[targetPeer.id] = []
         }
-        if let idx = privateChats[targetPeerID]?.firstIndex(where: { $0.id == message.id }) {
-            privateChats[targetPeerID]?[idx] = message
+        if let idx = privateChats[targetPeer.id]?.firstIndex(where: { $0.id == message.id }) {
+            privateChats[targetPeer.id]?[idx] = message
         } else {
-            privateChats[targetPeerID]?.append(message)
+            privateChats[targetPeer.id]?.append(message)
         }
         // Sanitize to avoid duplicate IDs
-        privateChatManager.sanitizeChat(for: Peer(str: targetPeerID))
+        privateChatManager.sanitizeChat(for: targetPeer)
     }
     
     @MainActor
-    private func mirrorToEphemeralIfNeeded(_ message: BitchatMessage, targetPeerID: String, key: Data?) {
+    private func mirrorToEphemeralIfNeeded(_ message: BitchatMessage, targetPeer: Peer, key: Data?) {
         guard let key,
               let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id,
-              ephemeralPeerID != targetPeerID
+              ephemeralPeerID != targetPeer.id
         else {
             return
         }
@@ -5213,8 +5213,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    private func handleViewingThisChat(_ message: BitchatMessage, targetPeerID: String, key: Data?, senderPubkey: String) {
-        unreadPrivateMessages.remove(targetPeerID)
+    private func handleViewingThisChat(_ message: BitchatMessage, targetPeer: Peer, key: Data?, senderPubkey: String) {
+        unreadPrivateMessages.remove(targetPeer.id)
         if let key,
            let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id {
             unreadPrivateMessages.remove(ephemeralPeerID)
@@ -5238,7 +5238,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func markAsUnreadIfNeeded(
         shouldMarkAsUnread: Bool,
-        targetPeerID: String,
+        targetPeer: Peer,
         key: Data?,
         isRecentMessage: Bool,
         senderNickname: String,
@@ -5246,17 +5246,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     ) {
         guard shouldMarkAsUnread else { return }
         
-        unreadPrivateMessages.insert(targetPeerID)
+        unreadPrivateMessages.insert(targetPeer.id)
         if let key,
            let ephemeralPeerID = unifiedPeerService.peers.first(where: { $0.noisePublicKey == key })?.id,
-           ephemeralPeerID != targetPeerID {
+           ephemeralPeerID != targetPeer.id {
             unreadPrivateMessages.insert(ephemeralPeerID)
         }
         if isRecentMessage {
             NotificationService.shared.sendPrivateMessageNotification(
                 from: senderNickname,
                 message: messageContent,
-                peer: Peer(str: targetPeerID)
+                peer: targetPeer
             )
         }
     }
