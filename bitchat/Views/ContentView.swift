@@ -197,7 +197,7 @@ struct ContentView: View {
             Button("direct message") {
                 if let peerID = selectedMessageSenderID {
                     if peerID.hasPrefix("nostr:") {
-                        if let full = viewModel.fullNostrHex(forSenderPeerID: peerID) {
+                        if let full = viewModel.fullNostrHex(forSender: Peer(str: peerID)) {
                             viewModel.startGeohashDM(withPubkeyHex: full)
                         }
                     } else {
@@ -225,7 +225,7 @@ struct ContentView: View {
             Button("BLOCK", role: .destructive) {
                 // Prefer direct geohash block when we have a Nostr sender ID
                 if let peerID = selectedMessageSenderID, peerID.hasPrefix("nostr:"),
-                   let full = viewModel.fullNostrHex(forSenderPeerID: peerID),
+                   let full = viewModel.fullNostrHex(forSender: Peer(str: peerID)),
                    let sender = selectedMessageSender {
                     viewModel.blockGeohashUser(pubkeyHexLowercased: full, displayName: sender)
                 } else if let sender = selectedMessageSender {

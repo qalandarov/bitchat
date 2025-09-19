@@ -2318,8 +2318,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     @MainActor
-    func fullNostrHex(forSenderPeerID senderID: String) -> String? {
-        return nostrKeyMapping[senderID]
+    func fullNostrHex(forSender sender: Peer) -> String? {
+        return nostrKeyMapping[sender.id]
     }
 
     @MainActor
