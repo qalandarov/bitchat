@@ -1866,24 +1866,23 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
 
     @MainActor
-    func isSelfSender(peerID: String?, displayName: String?) -> Bool {
-        guard let peerID else { return false }
-        if peerID == meshService.myPeer.id { return true }
-        let lowerPeer = peerID.lowercased()
-        guard lowerPeer.hasPrefix("nostr") else { return false }
+    func isSelfSender(peer: Peer, displayName: String?) -> Bool {
+        if peer == meshService.myPeer { return true }
+        guard peer.isNostr else { return false }
 
-        if let mapped = nostrKeyMapping[peerID]?.lowercased(),
+        if let mapped = nostrKeyMapping[peer.id]?.lowercased(),
            let gh = currentGeohash,
            let myIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
             if mapped == myIdentity.publicKeyHex.lowercased() { return true }
         }
 
-        if let gh = currentGeohash,
-           let myIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
+        if let gh = currentGeohash, let myIdentity = try? NostrIdentityBridge.deriveIdentity(forGeohash: gh) {
             let myLower = myIdentity.publicKeyHex.lowercased()
             let shortLen = TransportConfig.nostrShortKeyDisplayLength
             let shortKey = "nostr:" + myLower.prefix(shortLen)
-            if lowerPeer == shortKey { return true }
+            if peer.id == shortKey {
+                return true
+            }
             let suffix = myIdentity.publicKeyHex.suffix(4)
             let expected = (nickname + "#" + suffix).lowercased()
             if let display = displayName?.lowercased(), display == expected { return true }

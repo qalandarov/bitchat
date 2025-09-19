@@ -462,7 +462,7 @@ struct ContentView: View {
                         selectedMessageSender = viewModel.messages.last(where: { $0.senderPeer?.id == peerID && $0.sender != "system" })?.sender
                     }
                 }
-                if viewModel.isSelfSender(peerID: selectedMessageSenderID, displayName: selectedMessageSender) {
+                if let peerID = selectedMessageSenderID, viewModel.isSelfSender(peer: Peer(str: peerID), displayName: selectedMessageSender) {
                     selectedMessageSender = nil
                     selectedMessageSenderID = nil
                 } else {
