@@ -290,6 +290,8 @@ final class CommandProcessor {
             return .error(message: "can't find peer: \(nickname)")
         }
         
+        let peer = Peer(str: peerID)
+        
         if add {
             let existingFavorite = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey)
             FavoritesPersistenceService.shared.addFavorite(
@@ -298,15 +300,15 @@ final class CommandProcessor {
                 peerNickname: nickname
             )
             
-            chatViewModel?.toggleFavorite(peer: Peer(str: peerID))
-            chatViewModel?.sendFavoriteNotification(to: peerID, isFavorite: true)
+            chatViewModel?.toggleFavorite(peer: peer)
+            chatViewModel?.sendFavoriteNotification(to: peer, isFavorite: true)
             
             return .success(message: "added \(nickname) to favorites")
         } else {
             FavoritesPersistenceService.shared.removeFavorite(peerNoisePublicKey: noisePublicKey)
             
-            chatViewModel?.toggleFavorite(peer: Peer(str: peerID))
-            chatViewModel?.sendFavoriteNotification(to: peerID, isFavorite: false)
+            chatViewModel?.toggleFavorite(peer: peer)
+            chatViewModel?.sendFavoriteNotification(to: peer, isFavorite: false)
             
             return .success(message: "removed \(nickname) from favorites")
         }

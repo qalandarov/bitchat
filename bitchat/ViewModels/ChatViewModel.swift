@@ -5540,24 +5540,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func sendFavoriteNotification(to peerID: String, isFavorite: Bool) {
+    func sendFavoriteNotification(to peer: Peer, isFavorite: Bool) {
         // Handle both ephemeral peer IDs and Noise key hex strings
-        var noiseKey: Data?
-        
         // First check if peerID is a hex-encoded Noise key
-        if let hexKey = Data(hexString: peerID) {
-            noiseKey = hexKey
-        } else {
-            // It's an ephemeral peer ID, get the Noise key from UnifiedPeerService
-            if let peer = unifiedPeerService.getBitchatPeer(for: Peer(str: peerID)) {
-                noiseKey = peer.noisePublicKey
-            }
-        }
+        // It's an ephemeral peer ID, get the Noise key from UnifiedPeerService
+        let noiseKey = Data(hexString: peer.id) ?? unifiedPeerService.getBitchatPeer(for: peer)?.noisePublicKey
         
         // Try mesh first for connected peers
-        if meshService.isPeerConnected(Peer(str: peerID)) {
-            messageRouter.sendFavoriteNotification(to: Peer(str: peerID), isFavorite: isFavorite)
-            SecureLogger.debug("📤 Sent favorite notification via BLE to \(peerID)", category: .session)
+        if meshService.isPeerConnected(peer) {
+            messageRouter.sendFavoriteNotification(to: peer, isFavorite: isFavorite)
+            SecureLogger.debug("📤 Sent favorite notification via BLE to \(peer.id)", category: .session)
         } else if let key = noiseKey {
             // Send via Nostr for offline peers (using router)
             let recipientPeerID = key.hexEncodedString()
