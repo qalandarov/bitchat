@@ -1195,68 +1195,68 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func toggleFavorite(peerID: String) {
+    func toggleFavorite(peer: Peer) {
         // Distinguish between ephemeral peer IDs (16 hex chars) and Noise public keys (64 hex chars)
         // Ephemeral peer IDs are 8 bytes = 16 hex characters
         // Noise public keys are 32 bytes = 64 hex characters
         
-        if peerID.count == 64, let noisePublicKey = Data(hexString: peerID) {
-            // This is a stable Noise key hex (used in private chats)
-            // Find the ephemeral peer ID for this Noise key
-            let ephemeralPeerID = unifiedPeerService.peers.first { peer in
-                peer.noisePublicKey == noisePublicKey
-            }?.id
-            
-            if let ephemeralID = ephemeralPeerID {
-                // Found the ephemeral peer, use normal toggle
-                unifiedPeerService.toggleFavorite(Peer(str: ephemeralID))
-                // Also trigger UI update
-                objectWillChange.send()
-            } else {
-                // No ephemeral peer found, directly toggle via FavoritesPersistenceService
-                let currentStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey)
-                let wasFavorite = currentStatus?.isFavorite ?? false
-                
-                if wasFavorite {
-                    // Remove favorite
-                    FavoritesPersistenceService.shared.removeFavorite(peerNoisePublicKey: noisePublicKey)
-                } else {
-                    // Add favorite - get nickname from current status or from private chat messages
-                    var nickname = currentStatus?.peerNickname
-                    
-                    // If no nickname in status, try to get from private chat messages
-                    if nickname == nil, let messages = privateChats[peerID], !messages.isEmpty {
-                        // Get the nickname from the first message where this peer was the sender
-                        nickname = messages.first { $0.senderPeer?.id == peerID }?.sender
-                    }
-                    
-                    let finalNickname = nickname ?? "Unknown"
-                    let nostrKey = currentStatus?.peerNostrPublicKey ?? NostrIdentityBridge.getNostrPublicKey(for: noisePublicKey)
-                    
-                    FavoritesPersistenceService.shared.addFavorite(
-                        peerNoisePublicKey: noisePublicKey,
-                        peerNostrPublicKey: nostrKey,
-                        peerNickname: finalNickname
-                    )
-                }
-                
-                // Trigger UI update
-                objectWillChange.send()
-                
-                // Send favorite notification via Nostr if we're mutual favorites
-                if !wasFavorite && currentStatus?.theyFavoritedUs == true {
-                    // We just favorited them and they already favorite us - send via Nostr
-                    sendFavoriteNotificationViaNostr(noisePublicKey: noisePublicKey, isFavorite: true)
-                } else if wasFavorite {
-                    // We're unfavoriting - send via Nostr if they still favorite us
-                    sendFavoriteNotificationViaNostr(noisePublicKey: noisePublicKey, isFavorite: false)
-                }
-            }
-        } else {
+        guard let noisePublicKey = peer.noiseKey else {
             // This is an ephemeral peer ID (16 hex chars), use normal toggle
-            unifiedPeerService.toggleFavorite(Peer(str: peerID))
+            unifiedPeerService.toggleFavorite(peer)
             // Trigger UI update
             objectWillChange.send()
+            return
+        }
+        
+        // This is a stable Noise key hex (used in private chats)
+        // Find the ephemeral peer ID for this Noise key
+        let ephemeralPeerID = unifiedPeerService.peers.first { $0.noisePublicKey == noisePublicKey }?.id
+        
+        if let ephemeralID = ephemeralPeerID {
+            // Found the ephemeral peer, use normal toggle
+            unifiedPeerService.toggleFavorite(Peer(str: ephemeralID))
+            // Also trigger UI update
+            objectWillChange.send()
+            return
+        }
+
+        // No ephemeral peer found, directly toggle via FavoritesPersistenceService
+        let currentStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noisePublicKey)
+        let wasFavorite = currentStatus?.isFavorite ?? false
+        
+        if wasFavorite {
+            // Remove favorite
+            FavoritesPersistenceService.shared.removeFavorite(peerNoisePublicKey: noisePublicKey)
+        } else {
+            // Add favorite - get nickname from current status or from private chat messages
+            var nickname = currentStatus?.peerNickname
+            
+            // If no nickname in status, try to get from private chat messages
+            if nickname == nil, let messages = privateChats[peer.id], !messages.isEmpty {
+                // Get the nickname from the first message where this peer was the sender
+                nickname = messages.first { $0.senderPeer == peer }?.sender
+            }
+            
+            let finalNickname = nickname ?? "Unknown"
+            let nostrKey = currentStatus?.peerNostrPublicKey ?? NostrIdentityBridge.getNostrPublicKey(for: noisePublicKey)
+            
+            FavoritesPersistenceService.shared.addFavorite(
+                peerNoisePublicKey: noisePublicKey,
+                peerNostrPublicKey: nostrKey,
+                peerNickname: finalNickname
+            )
+        }
+        
+        // Trigger UI update
+        objectWillChange.send()
+        
+        // Send favorite notification via Nostr if we're mutual favorites
+        if !wasFavorite && currentStatus?.theyFavoritedUs == true {
+            // We just favorited them and they already favorite us - send via Nostr
+            sendFavoriteNotificationViaNostr(noisePublicKey: noisePublicKey, isFavorite: true)
+        } else if wasFavorite {
+            // We're unfavoriting - send via Nostr if they still favorite us
+            sendFavoriteNotificationViaNostr(noisePublicKey: noisePublicKey, isFavorite: false)
         }
     }
     

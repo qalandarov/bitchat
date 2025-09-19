@@ -297,14 +297,14 @@ final class CommandProcessor {
                 peerNickname: nickname
             )
             
-            chatViewModel?.toggleFavorite(peerID: peerID)
+            chatViewModel?.toggleFavorite(peer: Peer(str: peerID))
             chatViewModel?.sendFavoriteNotification(to: peerID, isFavorite: true)
             
             return .success(message: "added \(nickname) to favorites")
         } else {
             FavoritesPersistenceService.shared.removeFavorite(peerNoisePublicKey: noisePublicKey)
             
-            chatViewModel?.toggleFavorite(peerID: peerID)
+            chatViewModel?.toggleFavorite(peer: Peer(str: peerID))
             chatViewModel?.sendFavoriteNotification(to: peerID, isFavorite: false)
             
             return .success(message: "removed \(nickname) from favorites")

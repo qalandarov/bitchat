@@ -964,7 +964,7 @@ struct ContentView: View {
                                      }
                                  },
                                  onToggleFavorite: { peerID in
-                                     viewModel.toggleFavorite(peerID: peerID)
+                                     viewModel.toggleFavorite(peer: Peer(str: peerID))
                                  },
                                  onShowFingerprint: { peerID in
                                      viewModel.showFingerprint(for: peerID)
@@ -1505,7 +1505,7 @@ struct ContentView: View {
                         // Favorite button (hidden for geohash DMs)
                         if !(privatePeerID.hasPrefix("nostr_")) {
                             Button(action: {
-                                viewModel.toggleFavorite(peerID: headerPeerID)
+                                viewModel.toggleFavorite(peer: Peer(str: headerPeerID))
                             }) {
                                 Image(systemName: viewModel.isFavorite(peerID: headerPeerID) ? "star.fill" : "star")
                                     .font(.system(size: 16))
