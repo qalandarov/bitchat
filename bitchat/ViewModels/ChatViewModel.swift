@@ -294,7 +294,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     //
-    private var peerIDToPublicKeyFingerprint: [String: String] = [:]
+    private var peerToPublicKeyFingerprint: [Peer: String] = [:]
     private var selectedPrivateChatFingerprint: String? = nil
     // Map stable short peer IDs (16-hex) to full Noise public key hex (64-hex) for session continuity
     private var shortIDToNoiseKey: [String: String] = [:]
@@ -1285,7 +1285,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func getCurrentPeerForFingerprint(_ fingerprint: String) -> Peer? {
         // Search through all connected peers to find the one with matching fingerprint
         for peer in connectedPeers {
-            if let mappedFingerprint = peerIDToPublicKeyFingerprint[peer.id], mappedFingerprint == fingerprint {
+            if let mappedFingerprint = peerToPublicKeyFingerprint[peer], mappedFingerprint == fingerprint {
                 return peer
             }
         }
@@ -2684,9 +2684,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     selectedPrivateChatPeer = newPeer
                     
                     // Update fingerprint tracking if needed
-                    if let fingerprint = peerIDToPublicKeyFingerprint[oldPeer.id] {
-                        peerIDToPublicKeyFingerprint.removeValue(forKey: oldPeer.id)
-                        peerIDToPublicKeyFingerprint[newPeer.id] = fingerprint
+                    if let fingerprint = peerToPublicKeyFingerprint[oldPeer] {
+                        peerToPublicKeyFingerprint.removeValue(forKey: oldPeer)
+                        peerToPublicKeyFingerprint[newPeer] = fingerprint
                         selectedPrivateChatFingerprint = fingerprint
                     }
                     
@@ -2709,9 +2709,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                     
                     // Update fingerprint mapping
-                    if let fingerprint = peerIDToPublicKeyFingerprint[oldPeer.id] {
-                        peerIDToPublicKeyFingerprint.removeValue(forKey: oldPeer.id)
-                        peerIDToPublicKeyFingerprint[newPeer.id] = fingerprint
+                    if let fingerprint = peerToPublicKeyFingerprint[oldPeer] {
+                        peerToPublicKeyFingerprint.removeValue(forKey: oldPeer)
+                        peerToPublicKeyFingerprint[newPeer] = fingerprint
                     }
                 }
             }
@@ -3102,7 +3102,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Clear favorites and peer mappings
         // Clear through SecureIdentityStateManager instead of directly
         identityManager.clearAllIdentityData()
-        peerIDToPublicKeyFingerprint.removeAll()
+        peerToPublicKeyFingerprint.removeAll()
         
         // Clear persistent favorites from keychain
         FavoritesPersistenceService.shared.clearAllFavorites()
@@ -5630,7 +5630,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             for (oldPeer, messages) in privateChats {
                 if oldPeer != peer {
-                    let oldFingerprint = peerIDToPublicKeyFingerprint[oldPeer.id]
+                    let oldFingerprint = peerToPublicKeyFingerprint[oldPeer]
                     
                     // Filter messages to only recent ones
                     let recentMessages = messages.filter { $0.timestamp > cutoffTime }
@@ -5790,7 +5790,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Handle fingerprint-based chat updates
         if let chatFingerprint = selectedPrivateChatFingerprint,
-           let senderFingerprint = peerIDToPublicKeyFingerprint[senderPeer.id],
+           let senderFingerprint = peerToPublicKeyFingerprint[senderPeer],
            chatFingerprint == senderFingerprint && selectedPrivateChatPeer != senderPeer {
             selectedPrivateChatPeer = senderPeer
         }
