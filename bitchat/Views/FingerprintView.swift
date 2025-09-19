@@ -61,7 +61,7 @@ struct FingerprintView: View {
                     return "Unknown"
                 }()
                 // Accurate encryption state based on short ID session
-                let encryptionStatus = viewModel.getEncryptionStatus(for: statusPeerID)
+                let encryptionStatus = viewModel.getEncryptionStatus(for: Peer(str: statusPeerID))
                 
                 HStack {
                     if let icon = encryptionStatus.icon {

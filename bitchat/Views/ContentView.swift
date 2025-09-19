@@ -1467,7 +1467,7 @@ struct ContentView: View {
                                     }
                                     return headerPeerID
                                 }()
-                                let encryptionStatus = viewModel.getEncryptionStatus(for: statusPeerID)
+                                let encryptionStatus = viewModel.getEncryptionStatus(for: Peer(str: statusPeerID))
                                 if let icon = encryptionStatus.icon {
                                     Image(systemName: icon)
                                         .font(.system(size: 14))

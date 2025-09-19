@@ -3692,7 +3692,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Invalidate cache when encryption status changes
-        invalidateEncryptionCache(for: peer.id)
+        invalidateEncryptionCache(for: peer)
         
         // UI will update automatically via @Published properties
     }
@@ -3781,9 +3781,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     // Clear caches when data changes
-    private func invalidateEncryptionCache(for peerID: String? = nil) {
-        if let peerID = peerID {
-            encryptionStatusCache.removeValue(forKey: peerID)
+    private func invalidateEncryptionCache(for peer: Peer? = nil) {
+        if let peer {
+            encryptionStatusCache.removeValue(forKey: peer.id)
         } else {
             encryptionStatusCache.removeAll()
         }
@@ -4159,7 +4159,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Invalidate cache when encryption status changes
-        invalidateEncryptionCache(for: peerID)
+        invalidateEncryptionCache(for: Peer(str: peerID))
         
         // UI will update automatically via @Published properties
     }
@@ -4299,7 +4299,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
 
                 // Invalidate cache when encryption status changes
-                self.invalidateEncryptionCache(for: peerID)
+                self.invalidateEncryptionCache(for: Peer(str: peerID))
 
                 // Cache shortID -> full Noise key mapping as soon as session authenticates
                 if self.shortIDToNoiseKey[peerID] == nil,
@@ -4329,7 +4329,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 self.peerEncryptionStatus[peerID] = .noiseHandshaking
                 
                 // Invalidate cache when encryption status changes
-                self.invalidateEncryptionCache(for: peerID)
+                self.invalidateEncryptionCache(for: Peer(str: peerID))
             }
         }
     }
