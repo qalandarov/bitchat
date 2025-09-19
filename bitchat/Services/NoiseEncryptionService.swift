@@ -163,18 +163,18 @@ final class NoiseEncryptionService {
     private let rekeyCheckInterval: TimeInterval = 60.0 // Check every minute
     
     // Callbacks
-    private var onPeerAuthenticatedHandlers: [((String, String) -> Void)] = [] // Array of handlers for peer authentication
-    var onHandshakeRequired: ((String) -> Void)? // peerID needs handshake
+    private var onPeerAuthenticatedHandlers: [((Peer, String) -> Void)] = [] // Array of handlers for peer authentication
+    var onHandshakeRequired: ((Peer) -> Void)? // Peer needs handshake
     
     // Add a handler for peer authentication
-    func addOnPeerAuthenticatedHandler(_ handler: @escaping (String, String) -> Void) {
+    func addOnPeerAuthenticatedHandler(_ handler: @escaping (Peer, String) -> Void) {
         serviceQueue.async(flags: .barrier) { [weak self] in
             self?.onPeerAuthenticatedHandlers.append(handler)
         }
     }
     
     // Legacy support - setting this will add to the handlers array
-    var onPeerAuthenticated: ((String, String) -> Void)? {
+    var onPeerAuthenticated: ((Peer, String) -> Void)? {
         get { nil } // Always return nil for backward compatibility
         set {
             if let handler = newValue {
@@ -470,7 +470,7 @@ final class NoiseEncryptionService {
         // Check if we have an established session
         guard hasEstablishedSession(with: peer) else {
             // Signal that handshake is needed
-            onHandshakeRequired?(peer.id)
+            onHandshakeRequired?(peer)
             throw NoiseEncryptionError.handshakeRequired
         }
         
@@ -554,7 +554,7 @@ final class NoiseEncryptionService {
         // Notify all handlers about authentication
         serviceQueue.async { [weak self] in
             self?.onPeerAuthenticatedHandlers.forEach { handler in
-                handler(peer.id, fingerprint)
+                handler(peer, fingerprint)
             }
         }
     }
@@ -588,7 +588,7 @@ final class NoiseEncryptionService {
                 SecureLogger.debug("Key rotation initiated for peer: \(peer.id)", category: .security)
                 
                 // Signal that handshake is needed
-                onHandshakeRequired?(peer.id)
+                onHandshakeRequired?(peer)
             } catch {
                 SecureLogger.error(error, context: "Failed to initiate rekey for peer: \(peer.id)", category: .session)
             }

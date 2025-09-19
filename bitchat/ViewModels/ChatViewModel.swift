@@ -4260,38 +4260,38 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         let noiseService = meshService.getNoiseService()
         
         // Set up authentication callback
-        noiseService.onPeerAuthenticated = { [weak self] peerID, fingerprint in
+        noiseService.onPeerAuthenticated = { [weak self] peer, fingerprint in
             DispatchQueue.main.async {
                 guard let self = self else { return }
 
-                SecureLogger.debug("🔐 Authenticated: \(peerID)", category: .security)
+                SecureLogger.debug("🔐 Authenticated: \(peer.id)", category: .security)
 
                 // Update encryption status
                 if self.verifiedFingerprints.contains(fingerprint) {
-                    self.peerEncryptionStatus[Peer(str: peerID)] = .noiseVerified
+                    self.peerEncryptionStatus[peer] = .noiseVerified
                     // Encryption: noiseVerified
                 } else {
-                    self.peerEncryptionStatus[Peer(str: peerID)] = .noiseSecured
+                    self.peerEncryptionStatus[peer] = .noiseSecured
                     // Encryption: noiseSecured
                 }
 
                 // Invalidate cache when encryption status changes
-                self.invalidateEncryptionCache(for: Peer(str: peerID))
+                self.invalidateEncryptionCache(for: peer)
 
                 // Cache shortID -> full Noise key mapping as soon as session authenticates
-                if self.shortIDToNoiseKey[peerID] == nil,
-                   let keyData = self.meshService.getNoiseService().getPeerPublicKeyData(Peer(str: peerID)) {
+                if self.shortIDToNoiseKey[peer.id] == nil,
+                   let keyData = self.meshService.getNoiseService().getPeerPublicKeyData(peer) {
                     let stable = keyData.hexEncodedString()
-                    self.shortIDToNoiseKey[peerID] = stable
-                    SecureLogger.debug("🗺️ Mapped short peerID to Noise key for header continuity: \(peerID) -> \(stable.prefix(8))…", category: .session)
+                    self.shortIDToNoiseKey[peer.id] = stable
+                    SecureLogger.debug("🗺️ Mapped short peerID to Noise key for header continuity: \(peer.id) -> \(stable.prefix(8))…", category: .session)
                 }
 
                 // If a QR verification is pending but not sent yet, send it now that session is authenticated
-                if var pending = self.pendingQRVerifications[Peer(str: peerID)], pending.sent == false {
-                    self.meshService.sendVerifyChallenge(to: Peer(str: peerID), noiseKeyHex: pending.noiseKeyHex, nonceA: pending.nonceA)
+                if var pending = self.pendingQRVerifications[peer], pending.sent == false {
+                    self.meshService.sendVerifyChallenge(to: peer, noiseKeyHex: pending.noiseKeyHex, nonceA: pending.nonceA)
                     pending.sent = true
-                    self.pendingQRVerifications[Peer(str: peerID)] = pending
-                    SecureLogger.debug("📤 Sent deferred verify challenge to \(peerID) after handshake", category: .security)
+                    self.pendingQRVerifications[peer] = pending
+                    SecureLogger.debug("📤 Sent deferred verify challenge to \(peer.id) after handshake", category: .security)
                 }
 
                 // Schedule UI update
@@ -4300,13 +4300,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Set up handshake required callback
-        noiseService.onHandshakeRequired = { [weak self] peerID in
+        noiseService.onHandshakeRequired = { [weak self] peer in
             DispatchQueue.main.async {
                 guard let self = self else { return }
-                self.peerEncryptionStatus[Peer(str: peerID)] = .noiseHandshaking
+                self.peerEncryptionStatus[peer] = .noiseHandshaking
                 
                 // Invalidate cache when encryption status changes
-                self.invalidateEncryptionCache(for: Peer(str: peerID))
+                self.invalidateEncryptionCache(for: peer)
             }
         }
     }

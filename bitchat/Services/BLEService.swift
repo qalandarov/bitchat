@@ -332,10 +332,9 @@ final class BLEService: NSObject {
     }
     
     private func configureNoiseServiceCallbacks(for service: NoiseEncryptionService) {
-        service.onPeerAuthenticated = { [weak self] peerID, fingerprint in
-            SecureLogger.debug("🔐 Noise session authenticated with \(peerID), fingerprint: \(fingerprint.prefix(16))...")
+        service.onPeerAuthenticated = { [weak self] peer, fingerprint in
+            SecureLogger.debug("🔐 Noise session authenticated with \(peer.id), fingerprint: \(fingerprint.prefix(16))...")
             self?.messageQueue.async { [weak self] in
-                let peer = Peer(str: peerID)
                 self?.sendPendingMessagesAfterHandshake(for: peer)
                 self?.sendPendingNoisePayloadsAfterHandshake(for: peer)
             }
