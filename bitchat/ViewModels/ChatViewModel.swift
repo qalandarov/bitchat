@@ -1099,7 +1099,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func sendDeliveryAckIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard !sentGeoDeliveryAcks.contains(messageId) else { return }
         let nt = NostrTransport(keychain: keychain)
-        nt.senderPeerID = meshService.myPeer.id
+        nt.senderPeer = meshService.myPeer
         nt.sendDeliveryAckGeohash(for: messageId, toRecipientHex: senderPubKey, from: id)
         sentGeoDeliveryAcks.insert(messageId)
     }
@@ -1107,7 +1107,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func sendReadReceiptIfNeeded(to messageId: String, senderPubKey: String, from id: NostrIdentity) {
         guard !sentReadReceipts.contains(messageId) else { return }
         let nt = NostrTransport(keychain: keychain)
-        nt.senderPeerID = meshService.myPeer.id
+        nt.senderPeer = meshService.myPeer
         nt.sendReadReceiptGeohash(messageId, toRecipientHex: senderPubKey, from: id)
         sentReadReceipts.insert(messageId)
     }
@@ -2285,7 +2285,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }
             SecureLogger.debug("GeoDM: local send mid=\(messageID.prefix(8))… to=\(recipientHex.prefix(8))… conv=\(peer)", category: .session)
             let nostrTransport = NostrTransport(keychain: keychain)
-            nostrTransport.senderPeerID = meshService.myPeer.id
+            nostrTransport.senderPeer = meshService.myPeer
             nostrTransport.sendPrivateMessageGeohash(content: content, toRecipientHex: recipientHex, from: id, messageID: messageID)
             if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
                 privateChats[peer.id]?[msgIdx].deliveryStatus = .sent
@@ -2932,7 +2932,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 if !sentReadReceipts.contains(message.id) {
                     SecureLogger.debug("GeoDM: sending READ for mid=\(message.id.prefix(8))… to=\(recipientHex.prefix(8))…", category: .session)
                     let nostrTransport = NostrTransport(keychain: keychain)
-                    nostrTransport.senderPeerID = meshService.myPeer.id
+                    nostrTransport.senderPeer = meshService.myPeer
                     nostrTransport.sendReadReceiptGeohash(message.id, toRecipientHex: recipientHex, from: id)
                     sentReadReceipts.insert(message.id)
                 }
@@ -5200,7 +5200,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         } else if let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
             // Fallback: no Noise mapping yet — send directly to sender's Nostr pubkey
             let nt = NostrTransport(keychain: keychain)
-            nt.senderPeerID = meshService.myPeer.id
+            nt.senderPeer = meshService.myPeer
             nt.sendDeliveryAckGeohash(for: message.id, toRecipientHex: senderPubkey, from: id)
             SecureLogger.debug("Sent DELIVERED ack directly to Nostr pub=\(senderPubkey.prefix(8))… for mid=\(message.id.prefix(8))…", category: .session)
         }
@@ -5221,7 +5221,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 sentReadReceipts.insert(message.id)
             } else if let id = try? NostrIdentityBridge.getCurrentNostrIdentity() {
                 let nt = NostrTransport(keychain: keychain)
-                nt.senderPeerID = meshService.myPeer.id
+                nt.senderPeer = meshService.myPeer
                 nt.sendReadReceiptGeohash(message.id, toRecipientHex: senderPubkey, from: id)
                 sentReadReceipts.insert(message.id)
                 SecureLogger.debug("Viewing chat; sent READ ack directly to Nostr pub=\(senderPubkey.prefix(8))… for mid=\(message.id.prefix(8))…", category: .session)

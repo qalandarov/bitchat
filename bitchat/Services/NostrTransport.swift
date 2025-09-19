@@ -12,7 +12,7 @@ final class NostrTransport: Transport {
     func currentPeerSnapshots() -> [TransportPeerSnapshot] { [] }
 
     // Provide BLE short peer ID for BitChat embedding
-    var senderPeerID: String = ""
+    var senderPeer: Peer = .empty
 
     // Throttle READ receipts to avoid relay rate limits
     private struct QueuedRead {
@@ -24,7 +24,7 @@ final class NostrTransport: Transport {
     private let readAckInterval: TimeInterval = TransportConfig.nostrReadAckInterval
     private let keychain: KeychainManagerProtocol
 
-    var myPeer: Peer { Peer(str: senderPeerID) }
+    var myPeer: Peer { senderPeer }
     var myNickname: String { "" }
     func setNickname(_ nickname: String) { /* not used for Nostr */ }
     
@@ -77,7 +77,7 @@ final class NostrTransport: Transport {
                 SecureLogger.error("NostrTransport: failed to decode npub -> hex: \(error)", category: .session)
                 return
             }
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeer.id) else {
                 SecureLogger.error("NostrTransport: failed to embed PM packet", category: .session)
                 return
             }
@@ -117,7 +117,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { scheduleNextReadAck(); return }
                 recipientHex = data.hexEncodedString()
             } catch { scheduleNextReadAck(); return }
-            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peer.id, senderPeerID: senderPeerID) else {
+            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .readReceipt, messageID: item.receipt.originalMessageID, recipientPeerID: item.peer.id, senderPeerID: senderPeer.id) else {
                 SecureLogger.error("NostrTransport: failed to embed READ ack", category: .session)
                 scheduleNextReadAck(); return
             }
@@ -152,7 +152,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostr(content: content, messageID: UUID().uuidString, recipientPeerID: peer.id, senderPeerID: senderPeer.id) else {
                 SecureLogger.error("NostrTransport: failed to embed favorite notification", category: .session)
                 return
             }
@@ -193,7 +193,7 @@ final class NostrTransport: Transport {
                 guard hrp == "npub" else { return }
                 recipientHex = data.hexEncodedString()
             } catch { return }
-            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeerID) else {
+            guard let ack = NostrEmbeddedBitChat.encodeAckForNostr(type: .delivered, messageID: messageID, recipientPeerID: peer.id, senderPeerID: senderPeer.id) else {
                 SecureLogger.error("NostrTransport: failed to embed DELIVERED ack", category: .session)
                 return
             }
@@ -210,7 +210,7 @@ final class NostrTransport: Transport {
     func sendDeliveryAckGeohash(for messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         Task { @MainActor in
             SecureLogger.debug("GeoDM: send DELIVERED -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
-            guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .delivered, messageID: messageID, senderPeerID: senderPeerID) else { return }
+            guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .delivered, messageID: messageID, senderPeerID: senderPeer.id) else { return }
             guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: recipientHex, senderIdentity: identity) else { return }
             NostrRelayManager.registerPendingGiftWrap(id: event.id)
             NostrRelayManager.shared.sendEvent(event)
@@ -220,7 +220,7 @@ final class NostrTransport: Transport {
     func sendReadReceiptGeohash(_ messageID: String, toRecipientHex recipientHex: String, from identity: NostrIdentity) {
         Task { @MainActor in
             SecureLogger.debug("GeoDM: send READ -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
-            guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .readReceipt, messageID: messageID, senderPeerID: senderPeerID) else { return }
+            guard let embedded = NostrEmbeddedBitChat.encodeAckForNostrNoRecipient(type: .readReceipt, messageID: messageID, senderPeerID: senderPeer.id) else { return }
             guard let event = try? NostrProtocol.createPrivateMessage(content: embedded, recipientPubkey: recipientHex, senderIdentity: identity) else { return }
             NostrRelayManager.registerPendingGiftWrap(id: event.id)
             NostrRelayManager.shared.sendEvent(event)
@@ -233,7 +233,7 @@ final class NostrTransport: Transport {
             guard !recipientHex.isEmpty else { return }
             SecureLogger.debug("GeoDM: send PM -> recip=\(recipientHex.prefix(8))… mid=\(messageID.prefix(8))… from=\(identity.publicKeyHex.prefix(8))…", category: .session)
             // Build embedded BitChat packet without recipient peer ID
-            guard let embedded = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(content: content, messageID: messageID, senderPeerID: senderPeerID) else {
+            guard let embedded = NostrEmbeddedBitChat.encodePMForNostrNoRecipient(content: content, messageID: messageID, senderPeerID: senderPeer.id) else {
                 SecureLogger.error("NostrTransport: failed to embed geohash PM packet", category: .session)
                 return
             }
