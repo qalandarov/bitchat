@@ -12,7 +12,7 @@ import SwiftUI
 
 /// Manages all private chat functionality
 final class PrivateChatManager: ObservableObject {
-    @Published var privateChats: [String: [BitchatMessage]] = [:]
+    @Published var privateChats: [Peer: [BitchatMessage]] = [:]
     @Published var selectedPeer: Peer? = nil
     @Published var unreadMessages: Set<Peer> = []
     
@@ -43,8 +43,8 @@ final class PrivateChatManager: ObservableObject {
         markAsRead(from: peer)
         
         // Initialize chat if needed
-        if privateChats[peer.id] == nil {
-            privateChats[peer.id] = []
+        if privateChats[peer] == nil {
+            privateChats[peer] = []
         }
     }
     
@@ -56,7 +56,7 @@ final class PrivateChatManager: ObservableObject {
     
     /// Remove duplicate messages by ID and keep chronological order
     func sanitizeChat(for peer: Peer) {
-        guard let arr = privateChats[peer.id] else { return }
+        guard let arr = privateChats[peer] else { return }
         var seen = Set<String>()
         var deduped: [BitchatMessage] = []
         for msg in arr.sorted(by: { $0.timestamp < $1.timestamp }) {
@@ -70,7 +70,7 @@ final class PrivateChatManager: ObservableObject {
                 }
             }
         }
-        privateChats[peer.id] = deduped
+        privateChats[peer] = deduped
     }
     
     /// Mark messages from a peer as read
@@ -78,7 +78,7 @@ final class PrivateChatManager: ObservableObject {
         unreadMessages.remove(peer)
         
         // Send read receipts for unread messages that haven't been sent yet
-        if let messages = privateChats[peer.id] {
+        if let messages = privateChats[peer] {
             for message in messages {
                 if message.senderPeer == peer && !message.isRelay && !sentReadReceipts.contains(message.id) {
                     sendReadReceipt(for: message)

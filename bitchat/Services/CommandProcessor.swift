@@ -124,7 +124,7 @@ final class CommandProcessor {
     
     private func handleClear() -> CommandResult {
         if let peer = chatViewModel?.selectedPrivateChatPeer {
-            chatViewModel?.privateChats[peer.id]?.removeAll()
+            chatViewModel?.privateChats[peer]?.removeAll()
         } else {
             chatViewModel?.clearCurrentPublicTimeline()
         }

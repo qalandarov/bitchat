@@ -609,7 +609,7 @@ struct ContentView: View {
             }
             .onChange(of: viewModel.privateChats) { _ in
                 if let peerID = privatePeer,
-                   let messages = viewModel.privateChats[peerID],
+                   let messages = viewModel.privateChats[Peer(str: peerID)],
                    !messages.isEmpty {
                     // If the newest private message is from me, always scroll
                     let lastMsg = messages.last!

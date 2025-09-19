@@ -248,7 +248,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     var connectedPeers: [Peer] { Array(unifiedPeerService.connectedPeers) }
     @Published var allBitchatPeers: [BitchatPeer] = []
-    var privateChats: [String: [BitchatMessage]] { 
+    var privateChats: [Peer: [BitchatMessage]] {
         get { privateChatManager.privateChats }
         set { privateChatManager.privateChats = newValue }
     }
@@ -278,7 +278,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     func openMostRelevantPrivateChat() {
         // Pick most recent unread by last message timestamp
         let unreadSorted = unreadPrivateMessages
-            .map { ($0, privateChats[$0.id]?.last?.timestamp ?? Date.distantPast) }
+            .map { ($0, privateChats[$0]?.last?.timestamp ?? Date.distantPast) }
             .sorted { $0.1 > $1.1 }
         if let target = unreadSorted.first?.0 {
             startPrivateChat(with: target)
@@ -289,7 +289,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             .map { (id: $0.key, ts: $0.value.last?.timestamp ?? Date.distantPast) }
             .sorted { $0.ts > $1.ts }
         if let target = recent.first?.id {
-            startPrivateChat(with: Peer(str: target))
+            startPrivateChat(with: target)
         }
     }
     
@@ -1049,8 +1049,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
         
+        let convPeer = Peer(str: convKey)
+        
         // Dedup storage
-        if privateChats[convKey]?.contains(where: { $0.id == messageId }) == true { return }
+        if privateChats[convPeer]?.contains(where: { $0.id == messageId }) == true { return }
         for (_, arr) in privateChats { if arr.contains(where: { $0.id == messageId }) { return } }
         let senderName = displayNameForNostrPubkey(senderPubkey)
         
@@ -1062,22 +1064,22 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             isRelay: false,
             isPrivate: true,
             recipientNickname: nickname,
-            senderPeer: Peer(str: convKey),
+            senderPeer: convPeer,
             deliveryStatus: .delivered(to: nickname, at: Date())
         )
         
-        if privateChats[convKey] == nil {
-            privateChats[convKey] = []
+        if privateChats[convPeer] == nil {
+            privateChats[convPeer] = []
         }
-        privateChats[convKey]?.append(msg)
+        privateChats[convPeer]?.append(msg)
         
         // pared back: omit view-state log
-        let isViewing = selectedPrivateChatPeer?.id == convKey
+        let isViewing = selectedPrivateChatPeer == convPeer
         let wasReadBefore = sentReadReceipts.contains(messageId)
         let isRecentMessage = Date().timeIntervalSince(messageTimestamp) < 30
         let shouldMarkUnread = !wasReadBefore && !isViewing && isRecentMessage
         if shouldMarkUnread {
-            unreadPrivateMessages.insert(Peer(str: convKey))
+            unreadPrivateMessages.insert(convPeer)
         }
         
         if isViewing {
@@ -1089,7 +1091,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 NotificationService.shared.sendPrivateMessageNotification(
                     from: senderName,
                     message: pm.content,
-                    peer: Peer(str: convKey)
+                    peer: convPeer
                 )
             }
         }
@@ -1179,7 +1181,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Check if any temporary Nostr peer IDs have unread messages from this nickname
         for unreadPeer in unreadPrivateMessages where unreadPeer.isNostrUnderscore {
             // Check if messages from this temporary peer match the nickname
-            if privateChats[unreadPeer.id]?.first?.sender.lowercased() == peerNickname {
+            if privateChats[unreadPeer]?.first?.sender.lowercased() == peerNickname {
                 return true
             }
         }
@@ -1225,7 +1227,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             var nickname = currentStatus?.peerNickname
             
             // If no nickname in status, try to get from private chat messages
-            if nickname == nil, let messages = privateChats[peer.id], !messages.isEmpty {
+            if nickname == nil, let messages = privateChats[peer], !messages.isEmpty {
                 // Get the nickname from the first message where this peer was the sender
                 nickname = messages.first { $0.senderPeer == peer }?.sender
             }
@@ -1301,18 +1303,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             if let oldPeer = selectedPrivateChatPeer, oldPeer != currentPeer {
                 
                 // Migrate messages from old peer ID to new peer ID
-                if let oldMessages = privateChats[oldPeer.id] {
+                if let oldMessages = privateChats[oldPeer] {
                     var chats = privateChats
-                    if chats[currentPeer.id] == nil {
-                        chats[currentPeer.id] = []
+                    if chats[currentPeer] == nil {
+                        chats[currentPeer] = []
                     }
-                    chats[currentPeer.id]?.append(contentsOf: oldMessages)
+                    chats[currentPeer]?.append(contentsOf: oldMessages)
                     // Sort by timestamp
-                    chats[currentPeer.id]?.sort { $0.timestamp < $1.timestamp }
+                    chats[currentPeer]?.sort { $0.timestamp < $1.timestamp }
                     
                     // Remove duplicates
                     var seen = Set<String>()
-                    chats[currentPeer.id] = chats[currentPeer.id]?.filter { msg in
+                    chats[currentPeer] = chats[currentPeer]?.filter { msg in
                         if seen.contains(msg.id) {
                             return false
                         }
@@ -1321,7 +1323,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                     
                     // Remove old peer ID
-                    chats.removeValue(forKey: oldPeer.id)
+                    chats.removeValue(forKey: oldPeer)
                     
                     // Update all at once
                     privateChats = chats  // Trigger setter
@@ -1735,8 +1737,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         sendDeliveryAckIfNeeded(to: messageId, senderPubKey: senderPubkey, from: id)
         
+        let convPeer = Peer(str: convKey)
+        
         // Duplicate check
-        if privateChats[convKey]?.contains(where: { $0.id == messageId }) == true { return }
+        if privateChats[convPeer]?.contains(where: { $0.id == messageId }) == true { return }
         for (_, arr) in privateChats {
             if arr.contains(where: { $0.id == messageId }) {
                 return
@@ -1752,21 +1756,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             isRelay: false,
             isPrivate: true,
             recipientNickname: nickname,
-            senderPeer: Peer(str: convKey),
+            senderPeer: convPeer,
             deliveryStatus: .delivered(to: nickname, at: Date())
         )
         
-        if privateChats[convKey] == nil {
-            privateChats[convKey] = []
+        if privateChats[convPeer] == nil {
+            privateChats[convPeer] = []
         }
-        privateChats[convKey]?.append(msg)
+        privateChats[convPeer]?.append(msg)
         
-        let isViewing = selectedPrivateChatPeer?.id == convKey
+        let isViewing = selectedPrivateChatPeer == convPeer
         let wasReadBefore = sentReadReceipts.contains(messageId)
         let isRecentMessage = Date().timeIntervalSince(messageTimestamp) < 30
         let shouldMarkUnread = !wasReadBefore && !isViewing && isRecentMessage
         if shouldMarkUnread {
-            unreadPrivateMessages.insert(Peer(str: convKey))
+            unreadPrivateMessages.insert(convPeer)
         }
         
         // Send READ if viewing this conversation
@@ -1782,7 +1786,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             NotificationService.shared.sendPrivateMessageNotification(
                 from: senderName,
                 message: pm.content,
-                peer: Peer(str: convKey)
+                peer: convPeer
             )
         }
         
@@ -1791,25 +1795,25 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     
     private func handleDelivered(_ payload: NoisePayload, senderPubkey: String, convKey: String) {
         guard let messageID = String(data: payload.data, encoding: .utf8) else { return }
-        
-        if let idx = privateChats[convKey]?.firstIndex(where: { $0.id == messageID }) {
-            privateChats[convKey]?[idx].deliveryStatus = .delivered(to: displayNameForNostrPubkey(senderPubkey), at: Date())
+        let convPeer = Peer(str: convKey)
+        if let idx = privateChats[convPeer]?.firstIndex(where: { $0.id == messageID }) {
+            privateChats[convPeer]?[idx].deliveryStatus = .delivered(to: displayNameForNostrPubkey(senderPubkey), at: Date())
             objectWillChange.send()
             SecureLogger.info("GeoDM: recv DELIVERED for mid=\(messageID.prefix(8))… from=\(senderPubkey.prefix(8))…", category: .session)
         } else {
-            SecureLogger.warning("GeoDM: delivered ack for unknown mid=\(messageID.prefix(8))… conv=\(convKey)", category: .session)
+            SecureLogger.warning("GeoDM: delivered ack for unknown mid=\(messageID.prefix(8))… conv=\(convPeer.id)", category: .session)
         }
     }
     
     private func handleReadReceipt(_ payload: NoisePayload, senderPubkey: String, convKey: String) {
         guard let messageID = String(data: payload.data, encoding: .utf8) else { return }
-        
-        if let idx = privateChats[convKey]?.firstIndex(where: { $0.id == messageID }) {
-            privateChats[convKey]?[idx].deliveryStatus = .read(by: displayNameForNostrPubkey(senderPubkey), at: Date())
+        let convPeer = Peer(str: convKey)
+        if let idx = privateChats[convPeer]?.firstIndex(where: { $0.id == messageID }) {
+            privateChats[convPeer]?[idx].deliveryStatus = .read(by: displayNameForNostrPubkey(senderPubkey), at: Date())
             objectWillChange.send()
             SecureLogger.info("GeoDM: recv READ for mid=\(messageID.prefix(8))… from=\(senderPubkey.prefix(8))…", category: .session)
         } else {
-            SecureLogger.warning("GeoDM: read ack for unknown mid=\(messageID.prefix(8))… conv=\(convKey)", category: .session)
+            SecureLogger.warning("GeoDM: read ack for unknown mid=\(messageID.prefix(8))… conv=\(convPeer.id)", category: .session)
         }
     }
 
@@ -1963,10 +1967,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Remove geohash DM conversation if exists
-        let convKey = "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        if privateChats[convKey] != nil {
-            privateChats.removeValue(forKey: convKey)
-            unreadPrivateMessages.remove(Peer(str: convKey))
+        let convPeer = Peer(str: "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+        if privateChats[convPeer] != nil {
+            privateChats.removeValue(forKey: convPeer)
+            unreadPrivateMessages.remove(convPeer)
         }
         
         // Remove mapping keys pointing to this pubkey to avoid accidental resolution
@@ -2204,10 +2208,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         )
         
         // Add to local chat
-        if privateChats[peer.id] == nil {
-            privateChats[peer.id] = []
+        if privateChats[peer] == nil {
+            privateChats[peer] = []
         }
-        privateChats[peer.id]?.append(message)
+        privateChats[peer]?.append(message)
         
         // Trigger UI update for sent message
         objectWillChange.send()
@@ -2216,13 +2220,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if isConnected || isReachable || (isMutualFavorite && hasNostrKey) {
             messageRouter.sendPrivate(content, to: peer, recipientNickname: recipientNickname ?? "user", messageID: messageID)
             // Optimistically mark as sent for both transports; delivery/read will update subsequently
-            if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[idx].deliveryStatus = .sent
+            if let idx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[idx].deliveryStatus = .sent
             }
         } else {
             // Update delivery status to failed
-            if let index = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[index].deliveryStatus = .failed(reason: "Peer not reachable")
+            if let index = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[index].deliveryStatus = .failed(reason: "Peer not reachable")
             }
             addSystemMessage("Cannot send message to \(recipientNickname ?? "user") - peer is not reachable via mesh or Nostr.")
         }
@@ -2248,25 +2252,25 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             deliveryStatus: .sending
         )
         
-        if privateChats[peer.id] == nil {
-            privateChats[peer.id] = []
+        if privateChats[peer] == nil {
+            privateChats[peer] = []
         }
         
-        privateChats[peer.id]?.append(message)
+        privateChats[peer]?.append(message)
         objectWillChange.send()
 
         // Resolve recipient hex from mapping
         guard let recipientHex = nostrKeyMapping[peer.id] else {
-            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[msgIdx].deliveryStatus = .failed(reason: "unknown recipient")
+            if let msgIdx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[msgIdx].deliveryStatus = .failed(reason: "unknown recipient")
             }
             return
         }
         
         // Respect geohash blocks
         if identityManager.isNostrBlocked(pubkeyHexLowercased: recipientHex) {
-            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[msgIdx].deliveryStatus = .failed(reason: "user is blocked")
+            if let msgIdx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[msgIdx].deliveryStatus = .failed(reason: "user is blocked")
             }
             addSystemMessage("cannot send message: user is blocked.")
             return
@@ -2277,8 +2281,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let id = try NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash)
             // Prevent messaging ourselves
             if recipientHex.lowercased() == id.publicKeyHex.lowercased() {
-                if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                    privateChats[peer.id]?[idx].deliveryStatus = .failed(reason: "cannot message yourself")
+                if let idx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[peer]?[idx].deliveryStatus = .failed(reason: "cannot message yourself")
                 }
                 return
             }
@@ -2286,12 +2290,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let nostrTransport = NostrTransport(keychain: keychain)
             nostrTransport.senderPeer = meshService.myPeer
             nostrTransport.sendPrivateMessageGeohash(content: content, toRecipientHex: recipientHex, from: id, messageID: messageID)
-            if let msgIdx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[msgIdx].deliveryStatus = .sent
+            if let msgIdx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[msgIdx].deliveryStatus = .sent
             }
         } catch {
-            if let idx = privateChats[peer.id]?.firstIndex(where: { $0.id == messageID }) {
-                privateChats[peer.id]?[idx].deliveryStatus = .failed(reason: "send error")
+            if let idx = privateChats[peer]?.firstIndex(where: { $0.id == messageID }) {
+                privateChats[peer]?[idx].deliveryStatus = .failed(reason: "send error")
             }
         }
     }
@@ -2334,8 +2338,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             recipientNickname: meshService.peerNickname(peer: peer),
             senderPeer: meshService.myPeer
         )
-        if privateChats[peer.id] == nil { privateChats[peer.id] = [] }
-        privateChats[peer.id]?.append(systemMessage)
+        if privateChats[peer] == nil { privateChats[peer] = [] }
+        privateChats[peer]?.append(systemMessage)
         objectWillChange.send()
     }
     
@@ -2404,18 +2408,18 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If we have messages stored under the stable Noise key hex but not under the ephemeral ID,
             // or if we need to merge them, do so now
             if noiseKeyHexPeer != peer {
-                if let nostrMessages = privateChats[noiseKeyHexPeer.id], !nostrMessages.isEmpty {
+                if let nostrMessages = privateChats[noiseKeyHexPeer], !nostrMessages.isEmpty {
                     // Check if there are ACTUALLY unread messages (not just the unread flag)
                     // Only transfer unread status if there are recent unread messages
                     var hasActualUnreadMessages = false
                     
                     // Merge messages from stable key into ephemeral peer ID storage
-                    if privateChats[peer.id] == nil {
-                        privateChats[peer.id] = []
+                    if privateChats[peer] == nil {
+                        privateChats[peer] = []
                     }
                     
                     // Add any messages that aren't already in the ephemeral storage
-                    let existingMessageIds = Set(privateChats[peer.id]?.map { $0.id } ?? [])
+                    let existingMessageIds = Set(privateChats[peer]?.map { $0.id } ?? [])
                     for message in nostrMessages {
                         if !existingMessageIds.contains(message.id) {
                             // Create updated message with correct senderPeerID
@@ -2433,7 +2437,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 mentions: message.mentions,
                                 deliveryStatus: message.deliveryStatus
                             )
-                            privateChats[peer.id]?.append(updatedMessage)
+                            privateChats[peer]?.append(updatedMessage)
                             
                             // Check if this is an actually unread message
                             // Only mark as unread if:
@@ -2450,7 +2454,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                     
                     // Sort by timestamp
-                    privateChats[peer.id]?.sort { $0.timestamp < $1.timestamp }
+                    privateChats[peer]?.sort { $0.timestamp < $1.timestamp }
                     
                     // Only transfer unread status if there are actual recent unread messages
                     if hasActualUnreadMessages {
@@ -2461,7 +2465,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     }
                     
                     // Clean up the stable key storage to avoid duplication
-                    privateChats.removeValue(forKey: noiseKeyHexPeer.id)
+                    privateChats.removeValue(forKey: noiseKeyHexPeer)
                     
                     // Consolidated Nostr messages from stable key
                 }
@@ -2475,36 +2479,37 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var tempPeerIDsToConsolidate: [String] = []
         
         // Find all temporary Nostr peer IDs that have messages from the same nickname
-        for (storedPeerID, messages) in privateChats {
-            if storedPeerID.hasPrefix("nostr_") && storedPeerID != peer.id {
+        for (storedPeer, messages) in privateChats {
+            if storedPeer.isNostrUnderscore && storedPeer != peer {
                 // Check if ALL messages from this temporary peer have the same sender nickname
                 // This is more reliable than just checking the first message
                 let nicknamesMatch = messages.allSatisfy { msg in
                     msg.sender.lowercased() == currentPeerNickname
                 }
                 if nicknamesMatch && !messages.isEmpty {
-                    tempPeerIDsToConsolidate.append(storedPeerID)
+                    tempPeerIDsToConsolidate.append(storedPeer.id)
                 }
             }
         }
         
         // Consolidate messages from temporary Nostr peer IDs
         if !tempPeerIDsToConsolidate.isEmpty {
-            if privateChats[peer.id] == nil {
-                privateChats[peer.id] = []
+            if privateChats[peer] == nil {
+                privateChats[peer] = []
             }
             
-            let existingMessageIds = Set(privateChats[peer.id]?.map { $0.id } ?? [])
+            let existingMessageIds = Set(privateChats[peer]?.map { $0.id } ?? [])
             var consolidatedCount = 0
             
             var hadUnreadTemp = false
             for tempPeerID in tempPeerIDsToConsolidate {
+                let tempPeer = Peer(str: tempPeerID)
                 // Check if this temp peer ID had unread messages
-                if unreadPrivateMessages.contains(Peer(str: tempPeerID)) {
+                if unreadPrivateMessages.contains(tempPeer) {
                     hadUnreadTemp = true
                 }
                 
-                if let tempMessages = privateChats[tempPeerID] {
+                if let tempMessages = privateChats[tempPeer] {
                     for message in tempMessages {
                         if !existingMessageIds.contains(message.id) {
                             // Create a new message with the updated sender peer ID
@@ -2521,13 +2526,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                                 mentions: message.mentions,
                                 deliveryStatus: message.deliveryStatus
                             )
-                            privateChats[peer.id]?.append(updatedMessage)
+                            privateChats[peer]?.append(updatedMessage)
                             consolidatedCount += 1
                         }
                     }
                     // Remove the temporary storage
-                    privateChats.removeValue(forKey: tempPeerID)
-                    unreadPrivateMessages.remove(Peer(str: tempPeerID))
+                    privateChats.removeValue(forKey: tempPeer)
+                    unreadPrivateMessages.remove(tempPeer)
                 }
             }
             
@@ -2539,7 +2544,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             if consolidatedCount > 0 {
                 // Sort by timestamp
-                privateChats[peer.id]?.sort { $0.timestamp < $1.timestamp }
+                privateChats[peer]?.sort { $0.timestamp < $1.timestamp }
                 
                 SecureLogger.info("📥 Consolidated \(consolidatedCount) Nostr messages from temporary peer IDs to \(peerNickname)", category: .session)
             }
@@ -2561,7 +2566,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Delegate to private chat manager but add already-acked messages first
         // This prevents duplicate read receipts
         // IMPORTANT: Only add messages WE sent to sentReadReceipts, not messages we received
-        if let messages = privateChats[peer.id] {
+        if let messages = privateChats[peer] {
             for message in messages {
                 // Only track read receipts for messages WE sent (not received messages)
                 if message.sender == nickname {
@@ -2662,10 +2667,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     SecureLogger.info("📱 Updating private chat peer ID due to key change: \(oldPeer.id) -> \(newPeer.id)", category: .session)
                     
                     // Transfer private chat messages to new peer ID
-                    if let messages = privateChats[oldPeer.id] {
+                    if let messages = privateChats[oldPeer] {
                         var chats = privateChats
-                        chats[newPeer.id] = messages
-                        chats.removeValue(forKey: oldPeer.id)
+                        chats[newPeer] = messages
+                        chats.removeValue(forKey: oldPeer)
                         privateChats = chats  // Trigger setter
                     }
                     
@@ -2689,11 +2694,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     // UI will update automatically
                 } else {
                     // Even if the chat isn't open, migrate any existing private chat data
-                    if let messages = privateChats[oldPeer.id] {
+                    if let messages = privateChats[oldPeer] {
                         SecureLogger.debug("📱 Migrating private chat messages from \(oldPeer.id) to \(newPeer.id)", category: .session)
                         var chats = privateChats
-                        chats[newPeer.id] = messages
-                        chats.removeValue(forKey: oldPeer.id)
+                        chats[newPeer] = messages
+                        chats.removeValue(forKey: oldPeer)
                         privateChats = chats  // Trigger setter
                     }
                     
@@ -2812,10 +2817,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 senderPeer: meshService.myPeer
             )
             var chats = privateChats
-            if chats[peer.id] == nil {
-                chats[peer.id] = []
+            if chats[peer] == nil {
+                chats[peer] = []
             }
-            chats[peer.id]?.append(localNotification)
+            chats[peer]?.append(localNotification)
             privateChats = chats  // Trigger setter
             
         } else {
@@ -2926,7 +2931,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
            let recipientHex = nostrKeyMapping[peer.id],
            case .location(let ch) = LocationChannelManager.shared.selectedChannel,
            let id = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
-            let messages = privateChats[peer.id] ?? []
+            let messages = privateChats[peer] ?? []
             for message in messages where message.senderPeer == peer && !message.isRelay {
                 if !sentReadReceipts.contains(message.id) {
                     SecureLogger.debug("GeoDM: sending READ for mid=\(message.id.prefix(8))… to=\(recipientHex.prefix(8))…", category: .session)
@@ -2992,14 +2997,14 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var combined: [BitchatMessage] = []
 
         // Gather messages under the ephemeral peer ID
-        if let ephemeralMessages = privateChats[peer.id] {
+        if let ephemeralMessages = privateChats[peer] {
             combined.append(contentsOf: ephemeralMessages)
         }
 
         // Also include messages stored under the stable Noise key (Nostr path)
         if let bitchatPeer = unifiedPeerService.getBitchatPeer(for: peer) {
-            let noiseKeyHex = bitchatPeer.noisePublicKey.hexEncodedString()
-            if noiseKeyHex != peer.id, let nostrMessages = privateChats[noiseKeyHex] {
+            let noiseKeyHexPeer = Peer(str: bitchatPeer.noisePublicKey.hexEncodedString())
+            if noiseKeyHexPeer != peer, let nostrMessages = privateChats[noiseKeyHexPeer] {
                 combined.append(contentsOf: nostrMessages)
             }
         }
@@ -4378,8 +4383,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             case .delivered:
                 guard let messageID = String(data: payload, encoding: .utf8) else { return }
                 if let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname {
-                    if let messages = privateChats[peer.id], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peer.id]?[idx].deliveryStatus = .delivered(to: name, at: Date())
+                    if let messages = privateChats[peer], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                        privateChats[peer]?[idx].deliveryStatus = .delivered(to: name, at: Date())
                         objectWillChange.send()
                     }
                 }
@@ -4387,8 +4392,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             case .readReceipt:
                 guard let messageID = String(data: payload, encoding: .utf8) else { return }
                 if let name = unifiedPeerService.getBitchatPeer(for: peer)?.nickname {
-                    if let messages = privateChats[peer.id], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                        privateChats[peer.id]?[idx].deliveryStatus = .read(by: name, at: Date())
+                    if let messages = privateChats[peer], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                        privateChats[peer]?[idx].deliveryStatus = .read(by: name, at: Date())
                         objectWillChange.send()
                     }
                 }
@@ -4561,10 +4566,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
 
         if peer == selectedPrivateChatPeer, let stableKeyHex = derivedStableKeyHex {
+            let stableKeyHexPeer = Peer(str: stableKeyHex)
             // Migrate messages view context to stable key so header shows favorite + Nostr globe
-            if let messages = privateChats[peer.id] {
-                if privateChats[stableKeyHex] == nil { privateChats[stableKeyHex] = [] }
-                let existing = Set(privateChats[stableKeyHex]!.map { $0.id })
+            if let messages = privateChats[peer] {
+                if privateChats[stableKeyHexPeer] == nil { privateChats[stableKeyHexPeer] = [] }
+                let existing = Set(privateChats[stableKeyHexPeer]!.map { $0.id })
                 for msg in messages where !existing.contains(msg.id) {
                     let updated = BitchatMessage(
                         id: msg.id,
@@ -4575,20 +4581,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         originalSender: msg.originalSender,
                         isPrivate: msg.isPrivate,
                         recipientNickname: msg.recipientNickname,
-                        senderPeer: msg.senderPeer == meshService.myPeer ? meshService.myPeer : Peer(str: stableKeyHex),
+                        senderPeer: msg.senderPeer == meshService.myPeer ? meshService.myPeer : stableKeyHexPeer,
                         mentions: msg.mentions,
                         deliveryStatus: msg.deliveryStatus
                     )
-                    privateChats[stableKeyHex]?.append(updated)
+                    privateChats[stableKeyHexPeer]?.append(updated)
                 }
-                privateChats[stableKeyHex]?.sort { $0.timestamp < $1.timestamp }
-                privateChats.removeValue(forKey: peer.id)
+                privateChats[stableKeyHexPeer]?.sort { $0.timestamp < $1.timestamp }
+                privateChats.removeValue(forKey: peer)
             }
             if unreadPrivateMessages.contains(peer) {
                 unreadPrivateMessages.remove(peer)
-                unreadPrivateMessages.insert(Peer(str: stableKeyHex))
+                unreadPrivateMessages.insert(stableKeyHexPeer)
             }
-            selectedPrivateChatPeer = Peer(str: stableKeyHex)
+            selectedPrivateChatPeer = stableKeyHexPeer
             objectWillChange.send()
         }
         
@@ -4600,7 +4606,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Clear sent read receipts for this peer since they'll need to be resent after reconnection
         // Only clear receipts for messages from this specific peer
-        if let messages = privateChats[peer.id] {
+        if let messages = privateChats[peer] {
             for message in messages {
                 // Remove read receipts for messages FROM this peer (not TO this peer)
                 if message.senderPeer == peer {
@@ -4692,7 +4698,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 // Don't remove temporary Nostr peer IDs that have messages
                 if stale.isNostrUnderscore {
                     // Check if we have messages from this temporary peer
-                    if let messages = privateChats[stale.id], !messages.isEmpty {
+                    if let messages = privateChats[stale], !messages.isEmpty {
                         // Keep this ID - it has messages
                         continue
                     }
@@ -4701,7 +4707,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 // Don't remove stable Noise key hexes (64 char hex strings) that have messages
                 // These are used for Nostr messages when peer is offline
                 if stale.isNoiseKeyHex {
-                    if let messages = privateChats[stale.id], !messages.isEmpty {
+                    if let messages = privateChats[stale], !messages.isEmpty {
                         // Keep this ID - it's a stable key with messages
                         continue
                     }
@@ -5022,6 +5028,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let senderNickname = (actualSenderNoiseKey != nil) ? (FavoritesPersistenceService.shared.getFavoriteStatus(for: actualSenderNoiseKey!)?.peerNickname ?? "Unknown") : "Unknown"
             // Stable target ID if we know Noise key; otherwise temporary Nostr-based peer
             let targetPeerID = actualSenderNoiseKey?.hexEncodedString() ?? ("nostr_" + senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
+            let targetPeer = Peer(str: targetPeerID)
 
             switch noisePayload.type {
             case .privateMessage:
@@ -5029,7 +5036,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     noisePayload,
                     actualSenderNoiseKey: actualSenderNoiseKey,
                     senderNickname: senderNickname,
-                    targetPeer: Peer(str: targetPeerID),
+                    targetPeer: targetPeer,
                     messageTimestamp: messageTimestamp,
                     senderPubkey: senderPubkey
                 )
@@ -5038,16 +5045,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 guard let messageID = String(data: noisePayload.data, encoding: .utf8) else { return }
                 let peerName = senderNickname
                 // Update status to delivered
-                if let messages = privateChats[targetPeerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                    privateChats[targetPeerID]?[idx].deliveryStatus = .delivered(to: peerName, at: Date())
+                if let messages = privateChats[targetPeer], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[targetPeer]?[idx].deliveryStatus = .delivered(to: peerName, at: Date())
                     objectWillChange.send()
                 }
 
             case .readReceipt:
                 guard let messageID = String(data: noisePayload.data, encoding: .utf8) else { return }
                 let peerName = senderNickname
-                if let messages = privateChats[targetPeerID], let idx = messages.firstIndex(where: { $0.id == messageID }) {
-                    privateChats[targetPeerID]?[idx].deliveryStatus = .read(by: peerName, at: Date())
+                if let messages = privateChats[targetPeer], let idx = messages.firstIndex(where: { $0.id == messageID }) {
+                    privateChats[targetPeer]?[idx].deliveryStatus = .read(by: peerName, at: Date())
                     objectWillChange.send()
                 }
             case .verifyChallenge, .verifyResponse:
@@ -5148,7 +5155,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     private func isDuplicateMessage(_ messageId: String, targetPeer: Peer) -> Bool {
-        if privateChats[targetPeer.id]?.contains(where: { $0.id == messageId }) == true {
+        if privateChats[targetPeer]?.contains(where: { $0.id == messageId }) == true {
             return true
         }
         for (_, messages) in privateChats where messages.contains(where: { $0.id == messageId }) {
@@ -5158,13 +5165,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     private func addMessageToPrivateChatsIfNeeded(_ message: BitchatMessage, targetPeer: Peer) {
-        if privateChats[targetPeer.id] == nil {
-            privateChats[targetPeer.id] = []
+        if privateChats[targetPeer] == nil {
+            privateChats[targetPeer] = []
         }
-        if let idx = privateChats[targetPeer.id]?.firstIndex(where: { $0.id == message.id }) {
-            privateChats[targetPeer.id]?[idx] = message
+        if let idx = privateChats[targetPeer]?.firstIndex(where: { $0.id == message.id }) {
+            privateChats[targetPeer]?[idx] = message
         } else {
-            privateChats[targetPeer.id]?.append(message)
+            privateChats[targetPeer]?.append(message)
         }
         // Sanitize to avoid duplicate IDs
         privateChatManager.sanitizeChat(for: targetPeer)
@@ -5179,15 +5186,17 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
         
-        if privateChats[ephemeralPeerID] == nil {
-            privateChats[ephemeralPeerID] = []
+        let ephemeralPeer = Peer(str: ephemeralPeerID)
+        
+        if privateChats[ephemeralPeer] == nil {
+            privateChats[ephemeralPeer] = []
         }
-        if let idx = privateChats[ephemeralPeerID]?.firstIndex(where: { $0.id == message.id }) {
-            privateChats[ephemeralPeerID]?[idx] = message
+        if let idx = privateChats[ephemeralPeer]?.firstIndex(where: { $0.id == message.id }) {
+            privateChats[ephemeralPeer]?[idx] = message
         } else {
-            privateChats[ephemeralPeerID]?.append(message)
+            privateChats[ephemeralPeer]?.append(message)
         }
-        privateChatManager.sanitizeChat(for: Peer(str: ephemeralPeerID))
+        privateChatManager.sanitizeChat(for: ephemeralPeer)
     }
     
     @MainActor
@@ -5297,20 +5306,20 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Find and update the message status in ALL private chats (both stable and ephemeral)
         var messageFound = false
-        for (chatPeerID, messages) in privateChats {
+        for (chatPeer, messages) in privateChats {
             if let index = messages.firstIndex(where: { $0.id == messageId }) {
                 // Update delivery status based on ACK type
                 switch ackType {
                 case "DELIVERED":
-                    privateChats[chatPeerID]?[index].deliveryStatus = .delivered(to: "recipient", at: Date())
+                    privateChats[chatPeer]?[index].deliveryStatus = .delivered(to: "recipient", at: Date())
                 case "READ":
-                    privateChats[chatPeerID]?[index].deliveryStatus = .read(by: "recipient", at: Date())
+                    privateChats[chatPeer]?[index].deliveryStatus = .read(by: "recipient", at: Date())
                 default:
                     SecureLogger.warning("⚠️ Unknown ACK type: \(ackType)", category: .session)
                 }
                 
                 messageFound = true
-                SecureLogger.info("✅ Updated message \(messageId.prefix(16))... status to \(ackType) in chat \(chatPeerID.prefix(16))...", category: .session)
+                SecureLogger.info("✅ Updated message \(messageId.prefix(16))... status to \(ackType) in chat \(chatPeer.id.prefix(16))...", category: .session)
                 // Don't break - continue to update in all chats where this message exists
             }
         }
@@ -5446,10 +5455,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         )
         
         // Store in private chats
-        if privateChats[tempPeer.id] == nil {
-            privateChats[tempPeer.id] = []
+        if privateChats[tempPeer] == nil {
+            privateChats[tempPeer] = []
         }
-        privateChats[tempPeer.id]?.append(message)
+        privateChats[tempPeer]?.append(message)
         
         // For unknown senders (no Noise key), skip sending Nostr ACKs
         
@@ -5612,16 +5621,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func migratePrivateChatsIfNeeded(for peer: Peer, senderNickname: String) {
         let currentFingerprint = getFingerprint(for: peer)
         
-        if privateChats[peer.id] == nil || privateChats[peer.id]?.isEmpty == true {
+        if privateChats[peer] == nil || privateChats[peer]?.isEmpty == true {
             var migratedMessages: [BitchatMessage] = []
             var oldPeerIDsToRemove: [String] = []
             
             // Only migrate messages from the last 24 hours to prevent old messages from flooding
             let cutoffTime = Date().addingTimeInterval(-TransportConfig.uiMigrationCutoffSeconds)
             
-            for (oldPeerID, messages) in privateChats {
-                if oldPeerID != peer.id {
-                    let oldFingerprint = peerIDToPublicKeyFingerprint[oldPeerID]
+            for (oldPeer, messages) in privateChats {
+                if oldPeer != peer {
+                    let oldFingerprint = peerIDToPublicKeyFingerprint[oldPeer.id]
                     
                     // Filter messages to only recent ones
                     let recentMessages = messages.filter { $0.timestamp > cutoffTime }
@@ -5637,13 +5646,13 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         
                         // Only remove old peer ID if we migrated ALL its messages
                         if recentMessages.count == messages.count {
-                            oldPeerIDsToRemove.append(oldPeerID)
+                            oldPeerIDsToRemove.append(oldPeer.id)
                         } else {
                             // Keep old messages in original location but don't show in UI
-                            SecureLogger.info("📦 Partially migrating \(recentMessages.count) of \(messages.count) messages from \(oldPeerID)", category: .session)
+                            SecureLogger.info("📦 Partially migrating \(recentMessages.count) of \(messages.count) messages from \(oldPeer.id)", category: .session)
                         }
                         
-                        SecureLogger.info("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peer) (fingerprint match)", category: .session)
+                        SecureLogger.info("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeer.id) to \(peer.id) (fingerprint match)", category: .session)
                     } else if currentFingerprint == nil || oldFingerprint == nil {
                         // Check if this chat contains messages with this sender by nickname
                         let isRelevantChat = recentMessages.contains { msg in
@@ -5656,10 +5665,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                             
                             // Only remove if all messages were migrated
                             if recentMessages.count == messages.count {
-                                oldPeerIDsToRemove.append(oldPeerID)
+                                oldPeerIDsToRemove.append(oldPeer.id)
                             }
                             
-                            SecureLogger.warning("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeerID) to \(peer.id) (nickname match)", category: .session)
+                            SecureLogger.warning("📦 Migrating \(recentMessages.count) recent messages from old peer ID \(oldPeer.id) to \(peer.id) (nickname match)", category: .session)
                         }
                     }
                 }
@@ -5672,12 +5681,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 
                 // Directly modify privateChats to minimize UI disruption
                 for oldPeerID in oldPeerIDsToRemove {
-                    privateChats.removeValue(forKey: oldPeerID)
+                    privateChats.removeValue(forKey: Peer(str: oldPeerID))
                     unreadPrivateMessages.remove(Peer(str: oldPeerID))
                 }
                 
                 // Add or update messages for the new peer ID
-                if var existingMessages = privateChats[peer.id] {
+                if var existingMessages = privateChats[peer] {
                     // Merge with existing messages, replace-by-id semantics
                     for msg in migratedMessages {
                         if let i = existingMessages.firstIndex(where: { $0.id == msg.id }) {
@@ -5687,10 +5696,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         }
                     }
                     existingMessages.sort { $0.timestamp < $1.timestamp }
-                    privateChats[peer.id] = existingMessages
+                    privateChats[peer] = existingMessages
                 } else {
                     // Initialize with migrated messages
-                    privateChats[peer.id] = migratedMessages
+                    privateChats[peer] = migratedMessages
                 }
                 privateChatManager.sanitizeChat(for: peer)
                 
@@ -5725,29 +5734,29 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // IMPORTANT: Also consolidate messages from stable Noise key if this is an ephemeral peer
         // This ensures Nostr messages appear in BLE chats
         if senderPeer.isShort {  // This is an ephemeral peer ID (8 bytes = 16 hex chars)
-            if let peer = unifiedPeerService.getBitchatPeer(for: senderPeer) {
-                let stableKeyHex = peer.noisePublicKey.hexEncodedString()
+            if let bitchatPeer = unifiedPeerService.getBitchatPeer(for: senderPeer) {
+                let stableKeyHexPeer = Peer(str: bitchatPeer.noisePublicKey.hexEncodedString())
                 
                 // If we have messages stored under the stable key, merge them
-                if stableKeyHex != senderPeer.id, let nostrMessages = privateChats[stableKeyHex], !nostrMessages.isEmpty {
+                if stableKeyHexPeer != senderPeer, let nostrMessages = privateChats[stableKeyHexPeer], !nostrMessages.isEmpty {
                     // Merge messages from stable key into ephemeral peer ID storage
-                    if privateChats[senderPeer.id] == nil {
-                        privateChats[senderPeer.id] = []
+                    if privateChats[senderPeer] == nil {
+                        privateChats[senderPeer] = []
                     }
                     
                     // Add any messages that aren't already in the ephemeral storage
-                    let existingMessageIds = Set(privateChats[senderPeer.id]?.map { $0.id } ?? [])
+                    let existingMessageIds = Set(privateChats[senderPeer]?.map { $0.id } ?? [])
                     for nostrMessage in nostrMessages {
                         if !existingMessageIds.contains(nostrMessage.id) {
-                            privateChats[senderPeer.id]?.append(nostrMessage)
+                            privateChats[senderPeer]?.append(nostrMessage)
                         }
                     }
                     
                     // Sort by timestamp
-                    privateChats[senderPeer.id]?.sort { $0.timestamp < $1.timestamp }
+                    privateChats[senderPeer]?.sort { $0.timestamp < $1.timestamp }
                     
                     // Clean up the stable key storage to avoid duplication
-                    privateChats.removeValue(forKey: stableKeyHex)
+                    privateChats.removeValue(forKey: stableKeyHexPeer)
                     
                     SecureLogger.info("📥 Consolidated \(nostrMessages.count) Nostr messages from stable key to ephemeral peer \(senderPeer.id)", category: .session)
                 }
@@ -5755,9 +5764,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Initialize chat if needed
-        if privateChats[senderPeer.id] == nil {
+        if privateChats[senderPeer] == nil {
             var chats = privateChats
-            chats[senderPeer.id] = []
+            chats[senderPeer] = []
             privateChats = chats
         }
         
@@ -5774,7 +5783,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Store message
         var chats = privateChats
-        chats[senderPeer.id]?.append(messageToStore)
+        chats[senderPeer]?.append(messageToStore)
         privateChats = chats
         
         // UI updates via @Published reassignment above
