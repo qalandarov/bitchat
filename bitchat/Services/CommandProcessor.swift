@@ -145,12 +145,13 @@ final class CommandProcessor {
         }
         
         let emoteContent = "* \(emoji) \(myNickname) \(action) \(nickname)\(suffix) *"
+        let targetPeer = Peer(str: targetPeerID)
         
         if chatViewModel?.selectedPrivateChatPeer != nil {
             // In private chat
-            if let peerNickname = meshService?.peerNickname(peer: Peer(str: targetPeerID)) {
+            if let peerNickname = meshService?.peerNickname(peer: targetPeer) {
                 let personalMessage = "* \(emoji) \(myNickname) \(action) you\(suffix) *"
-                meshService?.sendPrivateMessage(personalMessage, to: Peer(str: targetPeerID), 
+                meshService?.sendPrivateMessage(personalMessage, to: targetPeer, 
                                                recipientNickname: peerNickname, 
                                                messageID: UUID().uuidString)
                 // Also add a local system message so the sender sees a natural-language confirmation
@@ -162,7 +163,7 @@ final class CommandProcessor {
                     }
                 }()
                 let localText = "\(emoji) you \(pastAction) \(nickname)\(suffix)"
-                chatViewModel?.addLocalPrivateSystemMessage(localText, to: targetPeerID)
+                chatViewModel?.addLocalPrivateSystemMessage(localText, to: targetPeer)
             }
         } else {
             // In public chat: send to active public channel (mesh or geohash)

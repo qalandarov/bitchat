@@ -2336,7 +2336,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     /// Add a local system message to a private chat (no network send)
     @MainActor
-    func addLocalPrivateSystemMessage(_ content: String, to peerID: String) {
+    func addLocalPrivateSystemMessage(_ content: String, to peer: Peer) {
         let systemMessage = BitchatMessage(
             sender: "system",
             content: content,
@@ -2344,12 +2344,12 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             isRelay: false,
             originalSender: nil,
             isPrivate: true,
-            recipientNickname: meshService.peerNickname(peer: Peer(str: peerID)),
+            recipientNickname: meshService.peerNickname(peer: peer),
             senderPeer: meshService.myPeer
         )
-        if privateChats[peerID] == nil { privateChats[peerID] = [] }
-        privateChats[peerID]?.append(systemMessage)
-        trimPrivateChatMessagesIfNeeded(for: peerID)
+        if privateChats[peer.id] == nil { privateChats[peer.id] = [] }
+        privateChats[peer.id]?.append(systemMessage)
+        trimPrivateChatMessagesIfNeeded(for: peer.id)
         objectWillChange.send()
     }
     
