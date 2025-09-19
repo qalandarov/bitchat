@@ -2903,22 +2903,22 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    private func sendReadReceipt(_ receipt: ReadReceipt, to peerID: String, originalTransport: String? = nil) {
+    private func sendReadReceipt(_ receipt: ReadReceipt, to peer: Peer, originalTransport: String? = nil) {
         // First, try to resolve the current peer ID in case they reconnected with a new ID
-        var actualPeerID = peerID
+        var actualPeer = peer
         
         // Check if this peer ID exists in current nicknames
-        if meshService.peerNickname(peer: Peer(str: peerID)) == nil {
+        if meshService.peerNickname(peer: peer) == nil {
             // Peer not found with this ID, try to find by fingerprint or nickname
-            if let oldNoiseKey = Data(hexString: peerID),
+            if let oldNoiseKey = Data(hexString: peer.id),
                let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: oldNoiseKey) {
                 let peerNickname = favoriteStatus.peerNickname
                 
                 // Search for the current peer ID with the same nickname
                 for (currentPeerID, currentNickname) in meshService.getPeerNicknames() {
                     if currentNickname == peerNickname {
-                        SecureLogger.info("📖 Resolved updated peer ID for read receipt: \(peerID) -> \(currentPeerID)", category: .session)
-                        actualPeerID = currentPeerID.id
+                        SecureLogger.info("📖 Resolved updated peer ID for read receipt: \(peer) -> \(currentPeerID)", category: .session)
+                        actualPeer = currentPeerID
                         break
                     }
                 }
@@ -2930,7 +2930,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             return
         }
         // Use router to decide (mesh if reachable, else Nostr if available)
-        messageRouter.sendReadReceipt(receipt, to: Peer(str: actualPeerID))
+        messageRouter.sendReadReceipt(receipt, to: actualPeer)
     }
     
     @MainActor
@@ -5907,7 +5907,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                         originalTransport = "nostr"
                     }
                     
-                    self.sendReadReceipt(receipt, to: recipientID, originalTransport: originalTransport)
+                    self.sendReadReceipt(receipt, to: Peer(str: recipientID), originalTransport: originalTransport)
                 }
                 sentReadReceipts.insert(message.id)
             }
