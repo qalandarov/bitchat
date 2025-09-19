@@ -83,7 +83,7 @@ struct MeshPeerList: View {
                             }
                         }
 
-                        if !isMe, viewModel.isPeerBlocked(peer.id) {
+                        if !isMe, viewModel.isPeerBlocked(Peer(str: peer.id)) {
                             Image(systemName: "nosign")
                                 .font(.system(size: 10))
                                 .foregroundColor(.red)

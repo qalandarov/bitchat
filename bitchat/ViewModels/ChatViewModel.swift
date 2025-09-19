@@ -1281,8 +1281,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Public Key and Identity Management
     
     @MainActor
-    func isPeerBlocked(_ peerID: String) -> Bool {
-        return unifiedPeerService.isBlocked(Peer(str: peerID))
+    func isPeerBlocked(_ peer: Peer) -> Bool {
+        return unifiedPeerService.isBlocked(peer)
     }
     
     // Helper method to find current peer ID for a fingerprint
@@ -5632,17 +5632,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Check if a message should be blocked based on sender
     @MainActor
     private func isMessageBlocked(_ message: BitchatMessage) -> Bool {
-        if let peerID = message.senderPeer?.id ?? getPeerIDForNickname(message.sender) {
-            // Check mesh/known peers first
-            if isPeerBlocked(peerID) { return true }
-            // Check geohash (Nostr) blocks using mapping to full pubkey
-            if peerID.hasPrefix("nostr") {
-                if let full = nostrKeyMapping[peerID]?.lowercased() {
-                    if identityManager.isNostrBlocked(pubkeyHexLowercased: full) { return true }
-                }
-            }
-            return false
+        guard let peerID = message.senderPeer?.id ?? getPeerIDForNickname(message.sender) else { return false }
+        let peer = Peer(str: peerID)
+        
+        // Check mesh/known peers first
+        if isPeerBlocked(peer) {
+            return true
         }
+        
+        // Check geohash (Nostr) blocks using mapping to full pubkey
+        if peer.isNostr,
+           let full = nostrKeyMapping[peer.id]?.lowercased(),
+           identityManager.isNostrBlocked(pubkeyHexLowercased: full) {
+            return true
+        }
+        
         return false
     }
 
