@@ -2597,7 +2597,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Also mark messages as read for Nostr ACKs
         // This ensures read receipts are sent even for consolidated messages
-        markPrivateMessagesAsRead(from: peer.id)
+        markPrivateMessagesAsRead(from: peer)
     }
     
     func endPrivateChat() {
@@ -2774,10 +2774,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // When app becomes active, send read receipts for visible private chat
         if let peerID = selectedPrivateChatPeer {
             // Try immediately
-            self.markPrivateMessagesAsRead(from: peerID)
+            self.markPrivateMessagesAsRead(from: Peer(str: peerID))
             // And again with a delay
             DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiAnimationMediumSeconds) {
-                self.markPrivateMessagesAsRead(from: peerID)
+                self.markPrivateMessagesAsRead(from: Peer(str: peerID))
             }
         }
         // Subscriptions will be resent after connections come back up
@@ -2934,16 +2934,16 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     }
     
     @MainActor
-    func markPrivateMessagesAsRead(from peerID: String) {
-        privateChatManager.markAsRead(from: Peer(str: peerID))
+    func markPrivateMessagesAsRead(from peer: Peer) {
+        privateChatManager.markAsRead(from: peer)
         
         // Handle GeoDM (nostr_*) read receipts directly via per-geohash identity
-        if peerID.hasPrefix("nostr_"),
-           let recipientHex = nostrKeyMapping[peerID],
+        if peer.isNostrUnderscore,
+           let recipientHex = nostrKeyMapping[peer.id],
            case .location(let ch) = LocationChannelManager.shared.selectedChannel,
            let id = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
-            let messages = privateChats[peerID] ?? []
-            for message in messages where message.senderPeer?.id == peerID && !message.isRelay {
+            let messages = privateChats[peer.id] ?? []
+            for message in messages where message.senderPeer == peer && !message.isRelay {
                 if !sentReadReceipts.contains(message.id) {
                     SecureLogger.debug("GeoDM: sending READ for mid=\(message.id.prefix(8))… to=\(recipientHex.prefix(8))…", category: .session)
                     let nostrTransport = NostrTransport(keychain: keychain)
@@ -2960,15 +2960,15 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var peerNostrPubkey: String? = nil
         
         // First check if peerID is already a hex Noise key
-        if let noiseKey = Data(hexString: peerID),
+        if let noiseKey = Data(hexString: peer.id),
            let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: noiseKey) {
-            noiseKeyHex = peerID
+            noiseKeyHex = peer.id
             peerNostrPubkey = favoriteStatus.peerNostrPublicKey
         }
         // Otherwise get the Noise key from the peer info
-        else if let peer = unifiedPeerService.getPeer(by: peerID) {
-            noiseKeyHex = peer.noisePublicKey.hexEncodedString()
-            let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: peer.noisePublicKey)
+        else if let bitchatPeer = unifiedPeerService.getPeer(by: peer.id) {
+            noiseKeyHex = bitchatPeer.noisePublicKey.hexEncodedString()
+            let favoriteStatus = FavoritesPersistenceService.shared.getFavoriteStatus(for: bitchatPeer.noisePublicKey)
             peerNostrPubkey = favoriteStatus?.peerNostrPublicKey
             
             // Also remove unread status from the stable Noise key if it exists
@@ -2980,18 +2980,21 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Send Nostr read ACKs if peer has Nostr capability
         if peerNostrPubkey != nil {
             // Check messages under both ephemeral peer ID and stable Noise key
-            let messagesToAck = getPrivateChatMessages(for: peerID)
+            let messagesToAck = getPrivateChatMessages(for: peer.id)
             
             for message in messagesToAck {
                 // Only send read ACKs for messages from the peer (not our own)
                 // Check both the ephemeral peer ID and stable Noise key as sender
-                if (message.senderPeer?.id == peerID || message.senderPeer?.id == noiseKeyHex) && !message.isRelay {
+                if (message.senderPeer == peer || message.senderPeer?.id == noiseKeyHex) && !message.isRelay {
                     // Skip if we already sent an ACK for this message
                     if !sentReadReceipts.contains(message.id) {
                         // Use stable Noise key hex if available; else fall back to peerID
-                        let recipPeer = (Data(hexString: peerID) != nil) ? peerID : (unifiedPeerService.getPeer(by: peerID)?.noisePublicKey.hexEncodedString() ?? peerID)
+                        var recipPeer = peer
+                        if Data(hexString: peer.id) == nil, let bitchatPeer = unifiedPeerService.getPeer(by: peer.id) {
+                            recipPeer = Peer(str: bitchatPeer.noisePublicKey.hexEncodedString())
+                        }
                         let receipt = ReadReceipt(originalMessageID: message.id, readerID: meshService.myPeer.id, readerNickname: nickname)
-                        messageRouter.sendReadReceipt(receipt, to: Peer(str: recipPeer))
+                        messageRouter.sendReadReceipt(receipt, to: recipPeer)
                         sentReadReceipts.insert(message.id)
                     }
                 }
@@ -5914,7 +5917,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             
             // Mark other messages as read
             DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiReadReceiptRetryShortSeconds) { [weak self] in
-                self?.markPrivateMessagesAsRead(from: peerID)
+                self?.markPrivateMessagesAsRead(from: Peer(str: peerID))
             }
         }
     }

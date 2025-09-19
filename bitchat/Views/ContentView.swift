@@ -666,14 +666,14 @@ struct ContentView: View {
                 // Also check when view appears
                 if let peerID = privatePeer {
                     // Try multiple times to ensure read receipts are sent
-                    viewModel.markPrivateMessagesAsRead(from: peerID)
+                    viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiReadReceiptRetryShortSeconds) {
-                        viewModel.markPrivateMessagesAsRead(from: peerID)
+                        viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
                     }
                     
                     DispatchQueue.main.asyncAfter(deadline: .now() + TransportConfig.uiReadReceiptRetryLongSeconds) {
-                        viewModel.markPrivateMessagesAsRead(from: peerID)
+                        viewModel.markPrivateMessagesAsRead(from: Peer(str: peerID))
                     }
                 }
             }
