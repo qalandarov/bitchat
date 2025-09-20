@@ -46,6 +46,10 @@ extension Peer {
         }
         return self
     }
+    
+    func toPercentEncoded() -> String {
+        id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    }
 }
 
 // MARK: - Validation
