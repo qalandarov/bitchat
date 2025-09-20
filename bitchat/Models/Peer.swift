@@ -112,6 +112,15 @@ extension Peer: ExpressibleByStringInterpolation {
     }
 }
 
+// MARK: - CustomStringConvertible
+
+extension Peer: CustomStringConvertible {
+    /// So Peer can be used inside a String for backwards compatibility
+    var description: String {
+        id
+    }
+}
+
 // MARK: - Codable
 
 extension Peer: Codable {
