@@ -165,8 +165,8 @@ extension Peer {
     
     /// Returns a 16-hex short peer ID derived from a 64-hex Noise public key if needed
     func toShort() -> Peer {
-        if id.count == Constants.maxIDLength, let data = Data(hexString: id) {
-            return Peer(publicKey: data)
+        if let noiseKey {
+            return Peer(publicKey: noiseKey)
         }
         return self
     }

@@ -132,8 +132,8 @@ final class SecureNoiseSession: NoiseSession {
 // MARK: - Rate Limiter
 
 final class NoiseRateLimiter {
-    private var handshakeTimestamps: [Peer: [Date]] = [:] // Peer -> timestamps
-    private var messageTimestamps: [Peer: [Date]] = [:] // Peer -> timestamps
+    private var handshakeTimestamps: [Peer: [Date]] = [:]
+    private var messageTimestamps: [Peer: [Date]] = [:]
     
     // Global rate limiting
     private var globalHandshakeTimestamps: [Date] = []

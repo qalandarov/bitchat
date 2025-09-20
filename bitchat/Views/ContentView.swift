@@ -1504,7 +1504,7 @@ struct ContentView: View {
                         Spacer()
                         
                         // Favorite button (hidden for geohash DMs)
-                        if !(privatePeer.isNostrUnderscore) {
+                        if !privatePeer.isNostrUnderscore {
                             let isFavorite = viewModel.isFavorite(peer: headerPeer)
                             Button(action: {
                                 viewModel.toggleFavorite(peer: headerPeer)

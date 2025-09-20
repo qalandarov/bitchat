@@ -148,8 +148,8 @@ final class NoiseEncryptionService {
     private let sessionManager: NoiseSessionManager
     
     // Peer fingerprints (SHA256 hash of static public key)
-    private var peerFingerprints: [Peer: String] = [:] // Peer -> fingerprint
-    private var fingerprintToPeer: [String: Peer] = [:] // fingerprint -> Peer
+    private var peerFingerprints: [Peer: String] = [:]
+    private var fingerprintToPeer: [String: Peer] = [:]
     
     // Thread safety
     private let serviceQueue = DispatchQueue(label: "chat.bitchat.noise.service", attributes: .concurrent)

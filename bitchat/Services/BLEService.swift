@@ -602,7 +602,7 @@ final class BLEService: NSObject {
         payload.append(contentsOf: receipt.originalMessageID.utf8)
 
         if noiseService.hasEstablishedSession(with: peer) {
-            SecureLogger.debug("📤 Sending READ receipt for message \(receipt.originalMessageID) to \(peer)", category: .session)
+            SecureLogger.debug("📤 Sending READ receipt for message \(receipt.originalMessageID) to \(peer.id)", category: .session)
             do {
                 let encrypted = try noiseService.encrypt(payload, for: peer)
                 let packet = BitchatPacket(

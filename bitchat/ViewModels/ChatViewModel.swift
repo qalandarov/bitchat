@@ -1628,10 +1628,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Store mapping for geohash DM initiation
-        let key16 = "nostr_" + String(event.pubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
-        nostrKeyMapping[Peer(str: key16)] = event.pubkey
-        let key8 = "nostr:" + String(event.pubkey.prefix(TransportConfig.nostrShortKeyDisplayLength))
-        nostrKeyMapping[Peer(str: key8)] = event.pubkey
+        let key16: Peer = "nostr_\(event.pubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))"
+        nostrKeyMapping[key16] = event.pubkey
+        let key8: Peer = "nostr:\(event.pubkey.prefix(TransportConfig.nostrShortKeyDisplayLength))"
+        nostrKeyMapping[key8] = event.pubkey
         
         // Update participants last-seen for this pubkey
         recordGeoParticipant(pubkeyHex: event.pubkey)
@@ -1967,7 +1967,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }
         
         // Remove geohash DM conversation if exists
-        let convPeer = Peer(str: "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+        let convPeer: Peer = "nostr_\(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))"
         if privateChats[convPeer] != nil {
             privateChats.removeValue(forKey: convPeer)
             unreadPrivateMessages.remove(convPeer)
@@ -2286,7 +2286,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 }
                 return
             }
-            SecureLogger.debug("GeoDM: local send mid=\(messageID.prefix(8))… to=\(recipientHex.prefix(8))… conv=\(peer)", category: .session)
+            SecureLogger.debug("GeoDM: local send mid=\(messageID.prefix(8))… to=\(recipientHex.prefix(8))… conv=\(peer.id)", category: .session)
             let nostrTransport = NostrTransport(keychain: keychain)
             nostrTransport.senderPeer = meshService.myPeer
             nostrTransport.sendPrivateMessageGeohash(content: content, toRecipientHex: recipientHex, from: id, messageID: messageID)
@@ -2303,7 +2303,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     // MARK: - Geohash DMs initiation
     @MainActor
     func startGeohashDM(withPubkeyHex hex: String) {
-        let convPeer = Peer(str: "nostr_" + String(hex.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+        let convPeer: Peer = "nostr_\(hex.prefix(TransportConfig.nostrConvKeyPrefixLength))"
         nostrKeyMapping[convPeer] = hex
         selectedPrivateChatPeer = convPeer
     }
@@ -3047,7 +3047,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             // If a disambiguation suffix is present (e.g., "name#abcd"), try exact displayName match first
             if nickname.contains("#") {
                 if let person = visibleGeohashPeople().first(where: { $0.displayName == nickname }) {
-                    let convPeer = Peer(str: "nostr_" + String(person.id.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+                    let convPeer: Peer = "nostr_\(person.id.prefix(TransportConfig.nostrConvKeyPrefixLength))"
                     nostrKeyMapping[convPeer] = person.id
                     return convPeer
                 }
@@ -3058,7 +3058,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             }().lowercased()
             // Try exact match against cached geoNicknames (pubkey -> nickname)
             if let pub = geoNicknames.first(where: { (_, nick) in nick.lowercased() == base })?.key {
-                let convPeer = Peer(str: "nostr_" + String(pub.prefix(TransportConfig.nostrConvKeyPrefixLength)))
+                let convPeer: Peer = "nostr_\(pub.prefix(TransportConfig.nostrConvKeyPrefixLength))"
                 nostrKeyMapping[convPeer] = pub
                 return convPeer
             }
@@ -3227,7 +3227,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 // In geohash channels, compare against our per-geohash nostr short ID
                 if case .location(let ch) = activeChannel, senderPeer.isNostrColon {
                     if let myGeo = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
-                        return senderPeer.id == "nostr:\(myGeo.publicKeyHex.prefix(TransportConfig.nostrShortKeyDisplayLength))"
+                        return senderPeer == "nostr:\(myGeo.publicKeyHex.prefix(TransportConfig.nostrShortKeyDisplayLength))"
                     }
                 }
                 return senderPeer == meshService.myPeer
@@ -3790,7 +3790,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     private func peerColor(for message: BitchatMessage, isDark: Bool) -> Color {
         if let senderPeer = message.senderPeer {
             if senderPeer.isNostrColon || senderPeer.isNostrUnderscore {
-                let full = nostrKeyMapping[senderPeer]?.lowercased() ?? senderPeer.toBare().id.lowercased()
+                let full = (nostrKeyMapping[senderPeer] ?? senderPeer.toBare().id).lowercased()
                 return getNostrPaletteColor(for: full, isDark: isDark)
             } else if senderPeer.isShort {
                 // Mesh short ID
@@ -5409,7 +5409,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // For now, create a temporary peer ID based on Nostr pubkey
         // This allows the message to be displayed even without Noise key mapping
-        let tempPeer = Peer(str: "nostr_" + senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))
+        let tempPeer: Peer = "nostr_\(senderPubkey.prefix(TransportConfig.nostrConvKeyPrefixLength))"
         
         // Check if we're viewing this unknown sender's chat
         let isViewingThisChat = selectedPrivateChatPeer == tempPeer
@@ -5552,8 +5552,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             SecureLogger.debug("📤 Sent favorite notification via BLE to \(peer.id)", category: .session)
         } else if let key = noiseKey {
             // Send via Nostr for offline peers (using router)
-            let recipientPeerID = key.hexEncodedString()
-            messageRouter.sendFavoriteNotification(to: Peer(str: recipientPeerID), isFavorite: isFavorite)
+            messageRouter.sendFavoriteNotification(to: Peer(str: key.hexEncodedString()), isFavorite: isFavorite)
         } else {
             SecureLogger.warning("⚠️ Cannot send favorite notification - peer not connected and no Nostr pubkey", category: .session)
         }

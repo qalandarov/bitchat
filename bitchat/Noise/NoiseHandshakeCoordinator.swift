@@ -56,7 +56,7 @@ final class NoiseHandshakeCoordinator {
     /// Lower peer ID becomes the initiator to prevent simultaneous attempts
     func determineHandshakeRole(myPeer: Peer, remotePeer: Peer) -> NoiseRole {
         // Use simple string comparison for deterministic ordering
-        return myPeer.id < remotePeer.id ? .initiator : .responder
+        return myPeer < remotePeer ? .initiator : .responder
     }
     
     /// Check if we should initiate handshake with a peer
