@@ -152,7 +152,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     private func normalizedSenderKey(for message: BitchatMessage) -> String {
-        if let spid = message.senderPeerID {
+        if let spid = message.senderPeerID?.id {
             if spid.hasPrefix("nostr:") || spid.hasPrefix("nostr_") {
                 let bare: String = {
                     if spid.hasPrefix("nostr:") { return String(spid.dropFirst(6)) }
@@ -1966,7 +1966,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if let gh = currentGeohash {
             if var arr = geoTimelines[gh] {
                 arr.removeAll { msg in
-                    if let spid = msg.senderPeerID, spid.hasPrefix("nostr") {
+                    if let spid = msg.senderPeerID?.id, spid.hasPrefix("nostr") {
                         if let full = nostrKeyMapping[spid]?.lowercased() { return full == hex }
                     }
                     return false
@@ -1977,7 +1977,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             switch activeChannel {
             case .location:
                 messages.removeAll { msg in
-                    if let spid = msg.senderPeerID, spid.hasPrefix("nostr") {
+                    if let spid = msg.senderPeerID?.id , spid.hasPrefix("nostr") {
                         if let full = nostrKeyMapping[spid]?.lowercased() { return full == hex }
                     }
                     return false
@@ -2675,7 +2675,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         
         // Store the Nostr pubkey if provided (for messages from unknown senders)
         if let nostrPubkey = notification.userInfo?["nostrPubkey"] as? String,
-           let senderPeerID = message.senderPeerID {
+           let senderPeerID = message.senderPeerID?.id {
             // Store mapping for read receipts
             nostrKeyMapping[senderPeerID] = nostrPubkey
         }
@@ -3295,7 +3295,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     func formatMessageAsText(_ message: BitchatMessage, colorScheme: ColorScheme) -> AttributedString {
         // Determine if this message was sent by self (mesh, geo, or DM)
         let isSelf: Bool = {
-            if let spid = message.senderPeerID {
+            if let spid = message.senderPeerID?.id {
                 // In geohash channels, compare against our per-geohash nostr short ID
                 if case .location(let ch) = activeChannel, spid.hasPrefix("nostr:") {
                     if let myGeo = try? NostrIdentityBridge.deriveIdentity(forGeohash: ch.geohash) {
@@ -3330,7 +3330,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
             let fontWeight: Font.Weight = isSelf ? .bold : .medium
             senderStyle.font = .bitchatSystem(size: 14, weight: fontWeight, design: .monospaced)
             // Make sender clickable: encode senderPeerID into a custom URL
-            if let spid = message.senderPeerID, let url = URL(string: "bitchat://user/\(spid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? spid)") {
+            if let spid = message.senderPeerID?.id, let url = URL(string: "bitchat://user/\(spid.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? spid)") {
                 senderStyle.link = url
             }
 
@@ -3861,7 +3861,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
 
     @MainActor
     private func peerColor(for message: BitchatMessage, isDark: Bool) -> Color {
-        if let spid = message.senderPeerID {
+        if let spid = message.senderPeerID?.id {
             if spid.hasPrefix("nostr:") || spid.hasPrefix("nostr_") {
                 let bare: String = {
                     if spid.hasPrefix("nostr:") { return String(spid.dropFirst(6)) }
@@ -5653,7 +5653,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     /// Check if a message should be blocked based on sender
     @MainActor
     private func isMessageBlocked(_ message: BitchatMessage) -> Bool {
-        if let peerID = message.senderPeerID ?? getPeerIDForNickname(message.sender) {
+        if let peerID = message.senderPeerID?.id ?? getPeerIDForNickname(message.sender) {
             // Check mesh/known peers first
             if isPeerBlocked(peerID) { return true }
             // Check geohash (Nostr) blocks using mapping to full pubkey
@@ -5693,7 +5693,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 originalSender: message.originalSender,
                 isPrivate: message.isPrivate,
                 recipientNickname: message.recipientNickname,
-                senderPeerID: message.senderPeerID,
+                senderPeerID: message.senderPeerID?.id,
                 mentions: message.mentions,
                 deliveryStatus: message.deliveryStatus
             )
@@ -5801,7 +5801,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
     @MainActor
     private func handlePrivateMessage(_ message: BitchatMessage) {
         SecureLogger.debug("📥 handlePrivateMessage called for message from \(message.sender)", category: .session)
-        let senderPeerID = message.senderPeerID ?? getPeerIDForNickname(message.sender)
+        let senderPeerID = message.senderPeerID?.id ?? getPeerIDForNickname(message.sender)
         
         guard let peerID = senderPeerID else { 
             SecureLogger.warning("⚠️ Could not get peer ID for sender \(message.sender)", category: .session)
@@ -5911,7 +5911,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                     readerNickname: nickname
                 )
                 
-                let recipientID = message.senderPeerID ?? peerID
+                let recipientID = message.senderPeerID?.id ?? peerID
                 
                 Task { @MainActor in
                     var originalTransport: String? = nil
@@ -5943,7 +5943,7 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         if isMessageBlocked(finalMessage) { return }
 
         // Classify origin: geochat if senderPeerID starts with 'nostr:', else mesh (or system)
-        let isGeo = finalMessage.senderPeerID?.hasPrefix("nostr:") == true
+        let isGeo = finalMessage.senderPeerID?.isGeoChat == true
 
         // Apply per-sender and per-content rate limits (drop if exceeded)
         if finalMessage.sender != "system" {
