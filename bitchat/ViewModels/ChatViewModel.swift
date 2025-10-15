@@ -123,33 +123,10 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         }()
     }
 
-    // MARK: - Spam resilience: token buckets
-    private struct TokenBucket {
-        var capacity: Double
-        var tokens: Double
-        var refillPerSec: Double
-        var lastRefill: Date
-
-        mutating func allow(cost: Double = 1.0, now: Date = Date()) -> Bool {
-            let dt = now.timeIntervalSince(lastRefill)
-            if dt > 0 {
-                tokens = min(capacity, tokens + dt * refillPerSec)
-                lastRefill = now
-            }
-            if tokens >= cost {
-                tokens -= cost
-                return true
-            }
-            return false
-        }
-    }
-
-    private var rateBucketsBySender: [String: TokenBucket] = [:]
-    private var rateBucketsByContent: [String: TokenBucket] = [:]
-    private let senderBucketCapacity: Double = TransportConfig.uiSenderRateBucketCapacity
-    private let senderBucketRefill: Double = TransportConfig.uiSenderRateBucketRefillPerSec // tokens per second
-    private let contentBucketCapacity: Double = TransportConfig.uiContentRateBucketCapacity
-    private let contentBucketRefill: Double = TransportConfig.uiContentRateBucketRefillPerSec // tokens per second
+    // MARK: - Spam resilience
+    /// Service responsible for rate limiting and duplicate suppression. Extracted from
+    /// ChatViewModel to simplify this class and facilitate testing of spam resilience logic.
+    private let rateLimiter: RateLimiterService
 
     @MainActor
     private func normalizedSenderKey(for message: BitchatMessage) -> String {
@@ -166,51 +143,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         return "name:" + message.sender.lowercased()
     }
 
-    private func normalizedContentKey(_ content: String) -> String {
-        // Lowercase, simplify URLs (strip query/fragment), collapse whitespace, bound length
-        let lowered = content.lowercased()
-        let ns = lowered as NSString
-        let range = NSRange(location: 0, length: ns.length)
-        var simplified = ""
-        var last = 0
-        for m in Regexes.simplifyHTTPURL.matches(in: lowered, options: [], range: range) {
-            if m.range.location > last {
-                simplified += ns.substring(with: NSRange(location: last, length: m.range.location - last))
-            }
-            let url = ns.substring(with: m.range)
-            if let q = url.firstIndex(where: { $0 == "?" || $0 == "#" }) {
-                simplified += String(url[..<q])
-            } else {
-                simplified += url
-            }
-            last = m.range.location + m.range.length
-        }
-        if last < ns.length { simplified += ns.substring(with: NSRange(location: last, length: ns.length - last)) }
-        let trimmed = simplified.trimmingCharacters(in: .whitespacesAndNewlines)
-        let collapsed = trimmed.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-        let prefix = String(collapsed.prefix(TransportConfig.contentKeyPrefixLength))
-        // Fast djb2 hash
-        let h = prefix.djb2()
-        return String(format: "h:%016llx", h)
-    }
-
-    // Persistent recent content map (LRU) to speed near-duplicate checks
-    private var contentLRUMap: [String: Date] = [:]
-    private var contentLRUOrder: [String] = []
-    private let contentLRUCap = TransportConfig.contentLRUCap
-    private func recordContentKey(_ key: String, timestamp: Date) {
-        if contentLRUMap[key] == nil { contentLRUOrder.append(key) }
-        contentLRUMap[key] = timestamp
-        if contentLRUOrder.count > contentLRUCap {
-            let overflow = contentLRUOrder.count - contentLRUCap
-            for _ in 0..<overflow {
-                if let victim = contentLRUOrder.first {
-                    contentLRUOrder.removeFirst()
-                    contentLRUMap.removeValue(forKey: victim)
-                }
-            }
-        }
-    }
+    // NOTE: normalizedContentKey and content LRU storage have been moved into
+    // RateLimiterService. See RateLimiterService.swift for implementation details.
     // MARK: - Published Properties
     
     @Published var messages: [BitchatMessage] = []
@@ -492,6 +426,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         idBridge: NostrIdentityBridge,
         identityManager: SecureIdentityStateManagerProtocol
     ) {
+        // Initialize the rate limiter before any services that might rely on it
+        self.rateLimiter = RateLimiterService()
         self.keychain = keychain
         self.idBridge = idBridge
         self.identityManager = identityManager
@@ -1437,8 +1373,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         messages.append(message)
         
         // Update content LRU for near-dup detection
-        let ckey = normalizedContentKey(message.content)
-        recordContentKey(ckey, timestamp: message.timestamp)
+        let ckey = rateLimiter.normalizedContentKey(message.content)
+        rateLimiter.recordContentKey(ckey, timestamp: message.timestamp)
         
         // Persist to channel-specific timelines
         switch activeChannel {
@@ -5943,15 +5879,11 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         // Apply per-sender and per-content rate limits (drop if exceeded)
         if finalMessage.sender != "system" {
             let senderKey = normalizedSenderKey(for: finalMessage)
-            let contentKey = normalizedContentKey(finalMessage.content)
-            let now = Date()
-            var sBucket = rateBucketsBySender[senderKey] ?? TokenBucket(capacity: senderBucketCapacity, tokens: senderBucketCapacity, refillPerSec: senderBucketRefill, lastRefill: now)
-            let senderAllowed = sBucket.allow(now: now)
-            rateBucketsBySender[senderKey] = sBucket
-            var cBucket = rateBucketsByContent[contentKey] ?? TokenBucket(capacity: contentBucketCapacity, tokens: contentBucketCapacity, refillPerSec: contentBucketRefill, lastRefill: now)
-            let contentAllowed = cBucket.allow(now: now)
-            rateBucketsByContent[contentKey] = cBucket
-            if !(senderAllowed && contentAllowed) { return }
+            let contentKey = rateLimiter.normalizedContentKey(finalMessage.content)
+            // If either bucket overflows, drop the message early
+            if !rateLimiter.allow(senderKey: senderKey, contentKey: contentKey) {
+                return
+            }
         }
 
         // Size cap: drop extremely large public messages early
@@ -6026,8 +5958,9 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
         var batchContentLatest: [String: Date] = [:]
         for m in publicBuffer {
             if seenIDs.contains(m.id) { continue }
-            let ckey = normalizedContentKey(m.content)
-            if let ts = contentLRUMap[ckey], abs(ts.timeIntervalSince(m.timestamp)) < 1.0 { continue }
+            let ckey = rateLimiter.normalizedContentKey(m.content)
+            // Drop near-duplicate messages within ~1 second based on recent history
+            if rateLimiter.isRecentDuplicate(contentKey: ckey, timestamp: m.timestamp, within: 1.0) { continue }
             if let ts = batchContentLatest[ckey], abs(ts.timeIntervalSince(m.timestamp)) < 1.0 { continue }
             seenIDs.insert(m.id)
             added.append(m)
@@ -6060,8 +5993,8 @@ final class ChatViewModel: ObservableObject, BitchatDelegate {
                 messages.append(m)
             }
             // Record content key for LRU
-            let ckey = normalizedContentKey(m.content)
-            recordContentKey(ckey, timestamp: m.timestamp)
+            let ckey = rateLimiter.normalizedContentKey(m.content)
+            rateLimiter.recordContentKey(ckey, timestamp: m.timestamp)
         }
         trimMessagesIfNeeded()
         // Update batch size stats and adjust interval
